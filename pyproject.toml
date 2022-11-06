@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "choicedesign"
+version = "0.1.0"
+description = ""
+authors = ["José Ignacio Hernández <joseignaciohernandezh@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+numpy = "^1.23.4"
+pandas = "^1.5.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
