@@ -1,0 +1,24 @@
+\begin{sphinxtheindex}
+\let\bigletter\sphinxstyleindexlettergroup
+\let\spxpagem \sphinxstyleindexpagemain
+\let\spxentry \sphinxstyleindexentry
+\let\spxextra \sphinxstyleindexextra
+
+  \bigletter C
+  \item \spxentry{choicedesign.design}
+    \subitem \spxentry{module}, \hyperpage{1}
+
+  \indexspace
+  \bigletter M
+  \item \spxentry{module}
+    \subitem \spxentry{choicedesign.design}, \hyperpage{1}
+
+  \indexspace
+  \bigletter O
+  \item \spxentry{optimise()}\spxextra{choicedesign.design.RUMDesign method}, \hyperpage{2}
+
+  \indexspace
+  \bigletter R
+  \item \spxentry{RUMDesign}\spxextra{class in choicedesign.design}, \hyperpage{1}
+
+\end{sphinxtheindex}

@@ -1,0 +1,3 @@
+\babel@toc {english}{}\relax 
+\contentsline {section}{\numberline {1}choicedesign.design}{1}{section.1}%
+\contentsline {section}{Index}{3}{section*.4}%
