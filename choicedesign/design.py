@@ -83,7 +83,7 @@ class RUMDesign:
                 self.pars += k['par']
         
     # Optimise
-    def optimise(self, cond: list[str] = None, n_blocks: int = None, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
+    def optimise(self, cond: list = None, n_blocks: int = None, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
         """Create D-efficient RUM design
 
         Starts the optimisation of the design using a random swapping 
