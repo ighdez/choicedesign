@@ -1,0 +1,6 @@
+0.1.2
+Corrected a bug on final utility balance
+Added evaluate() method
+
+0.1.1
+First release

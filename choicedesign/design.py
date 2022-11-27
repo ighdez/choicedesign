@@ -179,7 +179,7 @@ class RUMDesign:
             desmat,init_perf,self.K,self.J,self.N,self.levs,self.cods,self.pars,self.optout,self.asc,algconds,iter_lim,noimprov_lim,time_lim)
 
         # Compute utility balance ratio
-        ubalance_ratio = _utility_balance_mnl(desmat0,self.levs,self.cods,self.pars,self.K,self.J,self.N,self.optout,self.asc)
+        ubalance_ratio = _utility_balance_mnl(optimal_design,self.levs,self.cods,self.pars,self.K,self.J,self.N,self.optout,self.asc)
 
         ############################################################
         ############## Step 3: Arange final design #################
@@ -213,3 +213,37 @@ class RUMDesign:
         
         # Return the optimal design
         return optimal_design, init_perf, final_perf, final_iter, ubalance_ratio
+
+    # Evaluate
+    def evaluate(self, design: pd.DataFrame):
+        """Evaluate design
+
+        Evaluates a design stored in a Pandas data frame
+
+        Parameters
+        ----------
+        design : pd.DataFrame
+            Design to evaluate
+
+        Returns
+        -------
+        perf : float
+            The D-error of the design
+        ubalance_ratio : float
+            Utility balance ratio
+        """
+        # Drop CS column and Block (if present) from pandas dataframe
+        desmat0 = design.drop('CS',axis=1)
+
+        if 'Block' in desmat0.columns:
+            desmat0 = desmat0.drop('Block',axis=1)
+
+        # Convert to numpy array
+        desmat0 = desmat0.to_numpy()
+
+        # Evaluate the performance and utility balance of the design
+        perf = _derr(_imat_mnl,desmat0,self.levs,self.cods,self.pars,self.K,self.J,self.N,self.optout,self.asc)
+        ubalance_ratio = _utility_balance_mnl(desmat0,self.levs,self.cods,self.pars,self.K,self.J,self.N,self.optout,self.asc)
+
+        # Return performance and utility balance
+        return perf, ubalance_ratio
