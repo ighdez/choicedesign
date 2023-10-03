@@ -99,14 +99,18 @@ def _condgen(desname: str, cond: list, names: list, init: bool = False):
     return conditions
 
 # Generate initial design matrix
-def _initdesign(names: list, levs: list, ncs: int, cond: list):
+def _initdesign(names: list, levs: list, avail: list, ncs: int, cond: list):
     """Generate initial design matrix"""
     # Create and populate the initial design matrix
     desmat = []
 
-    for k in levs:
-        col = np.array((k * int(np.ceil(ncs/len(k))))[:ncs])
-        np.random.shuffle(col)
+    # for k in levs:
+    for k in range(len(levs)):
+        if avail[k] == 1:
+            col = np.array((levs[k] * int(np.ceil(ncs/len(levs[k]))))[:ncs])
+            np.random.shuffle(col)
+        else:
+            col = np.zeros(int(np.ceil(ncs/len(levs[k])))*len(levs[k]))[:ncs]
         desmat.append(col)
     
     desmat = np.array(desmat).T

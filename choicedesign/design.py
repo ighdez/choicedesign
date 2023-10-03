@@ -31,7 +31,9 @@ class RUMDesign:
             - `pars`: prior parameters of the attribute. If `coding = 'numeric' 
               then only one parameter is required. If `coding = 'dummy', then 
               `levels-1` parameters must be used. The first attribute level is 
-              taken as a baseline. 
+              taken as a baseline.
+            - `avail`: list with availabilities per alternative. Each element of 
+              the list is either zero (not available) or one (available).
     n_alts : int
         Number of alternatives, apart from the opt-out (if defined).
     self.ncs : int
@@ -55,12 +57,13 @@ class RUMDesign:
         self.optout = optout
         self.asc = asc
 
-        # Set names, levels, coding and pars
+        # Set names, levels, coding, fixed, pars and availability
         self.names = []
         self.levs = []
         self.cods = []
         self.fixed = []
         self.pars = []
+        self.avail = []
 
         # Start looping among alternatives and attributes
         for j in range(self.J+optout):
@@ -71,6 +74,7 @@ class RUMDesign:
                     self.levs.append([1] if a == (j+1) else [0])
                     self.cods.append('asc')
                     self.fixed.append(1)
+                    self.avail.append(1)
                     self.pars.append(asc[j+1] if a == (j+1) else 0)
 
             # Loop among attributes
@@ -80,6 +84,7 @@ class RUMDesign:
                     self.levs.append(k['levels'])
                     self.cods.append(k['coding'])
                     self.fixed.append(0)
+                    self.avail.append(k['avail'][j])
                 self.pars += k['par']
         
     # Optimise
@@ -164,7 +169,7 @@ class RUMDesign:
         init_perf = np.inf
 
         for _ in range(10):
-            desmat0 = _initdesign(names=self.names,levs=self.levs,ncs=self.N,cond=initconds)
+            desmat0 = _initdesign(names=self.names,levs=self.levs,avail=self.avail,ncs=self.N,cond=initconds)
             perf0 = _derr(_imat_mnl,desmat0,self.levs,self.cods,self.pars,self.K,self.J,self.N,self.optout,self.asc)
             if perf0 < init_perf:
                 desmat = desmat0.copy()
