@@ -129,7 +129,11 @@ def _initdesign(names: list, levs: list, avail: list, ncs: int, cond: list):
             if not check_all:
                 for _ in range(10000):
                     # Create a random vector of levels for the row in question
-                    desmat[i,:] = np.array([np.random.choice(i) for i in levs])
+                    for k in range(len(levs)):
+                        if avail[k] == 1:
+                            desmat[i,k] = np.random.choice(levs[k])
+                        else:
+                            desmat[i,k] = 0
                     
                     # Check if conditions are met with the new vector in the design.
                     check_all = []
