@@ -6,89 +6,100 @@ from unicodedata import name
 import pandas as pd
 import numpy as np
 import datetime
+from biogeme.expressions import Expression, MonteCarlo, log
+from biogeme.models import loglogit, logit
 
 from choicedesign.algorithms import _swapalg
-from choicedesign.criteria import _derr, _imat_mnl, _utility_balance_mnl
+from choicedesign.criteria import _derr, _utility_balance
 from choicedesign.utils import _blockgen, _condgen, _initdesign
 
-# RUM-based efficient design
-class RUMDesign:
+# Efficient design
+class EffDesign:
     """RUM-consistent discrete choice experiment design class
 
     This class allows to create an efficient design for a discrete choice 
-    experiment based in a Random Utility Maximisation (RUM) model [1].
+    experiment [1].
 
     Parameters
     ----------
+    alts : list
+        List of alternative names, to generate the design matrix
+    ncs : int
+        Number of choice situations.
     atts_list : list[dict]
         List of attributes of the design. Each element is a dictionary that 
         contains the following keys:
             
             - `name`: the attribute name
             - `levels`: a list of attribute levels
-            - `coding`: the coding of the attribute levels. Supporte types are 
-              'numeric' and 'dummy'.
-            - `pars`: prior parameters of the attribute. If `coding = 'numeric' 
-              then only one parameter is required. If `coding = 'dummy', then 
-              `levels-1` parameters must be used. The first attribute level is 
-              taken as a baseline.
-            - `avail`: list with availabilities per alternative. Each element of 
-              the list is either zero (not available) or one (available).
-    n_alts : int
-        Number of alternatives, apart from the opt-out (if defined).
-    self.ncs : int
-        Number of choice situations.
-    optout : bool, optional
-        Should an opt-out be included? If so, it is included as the last alternative, 
-        by default False.
-    asc : dict, optional
-        Dictionary that defines alternative-specific constants (ASC) and their respective 
-        prior parameters. Each key is the alternative in which an ASC is desired, and 
-        each value is the corresponding prior parameter.
+            - `avail`: a list that details whether the attribute is part of 
+            a specific alternative. Each element is one of the alternative 
+            names of the parameter `alts`.
     """
 
     # Init method
-    def __init__(self,atts_list: list, n_alts: int, ncs: int, optout: bool = False, asc: dict = None):
+    def __init__(self,atts_list: list, alts: list, ncs: int):
 
         # Define scalars
         self.N = ncs
-        self.J = n_alts
+        self.J = len(alts)
         self.K = len(atts_list)
-        self.optout = optout
-        self.asc = asc
-
-        # Set names, levels, coding, fixed, pars and availability
+ 
+        # Set names and levels
         self.names = []
         self.levs = []
-        self.cods = []
-        self.fixed = []
-        self.pars = []
-        self.avail = []
 
-        # Start looping among alternatives and attributes
-        for j in range(self.J+optout):
-            # If ASC are defined, then add them to the lists
-            if asc is not None:
-                for a in asc:
-                    self.names.append('alt' + str(j+1) + '_asc' + str(a) if j < self.J else 'optout_asc' + str(a))
-                    self.levs.append([1] if a == (j+1) else [0])
-                    self.cods.append('asc')
-                    self.fixed.append(1)
-                    self.avail.append(1)
-                    self.pars.append(asc[j+1] if a == (j+1) else 0)
-
-            # Loop among attributes
+        for j in alts:
             for k in atts_list:
-                if j < self.J:
-                    self.names.append('alt' + str(j+1) + '_' + k['name'])
+                if j in k['avail']:
+                    self.names.append(j + '_' + k['name'])
                     self.levs.append(k['levels'])
-                    self.cods.append(k['coding'])
-                    self.fixed.append(0)
-                    self.avail.append(k['avail'][j])
-                self.pars += k['par']
-        
+
+    # Generate initial design matrix
+    def gen_initdesign(self,cond: list = None, seed: bool = None):
+        """Generate initial design matrix
+
+        It generates the initial design matrix. The user can define a set of
+        conditions that must be satisfied.
+
+        Parameters
+        -------
+        cond : list[str], optional
+            List of conditions that the final design must hold. Each element 
+            is a string that contains a single condition. Conditions 
+            can be of the form of binary relations (e.g., `X > Y` where `X` 
+            and `Y` are attributes of a specific alternative) or conditional 
+            relations (e.g., `if X > a then Y < b` where `a` and `b` are values).
+            Users can specify multiple conditions when the operator `if` is defined, 
+            separated by the operator `&`, by default None
+        seed : bool, None
+            Random seed, by default None
+
+        Returns
+        -------
+        init_design : pandas.DataFrame
+            A Pandas DataFrame with the initial design matrix.
+        """
+
+        # Generate conditions if defined
+        if cond is not None:
+            self.initconds = _condgen('desmat',cond,self.names,init=True)
+            self.algconds = _condgen('swapdes',cond,self.names,init=False)
+        else:
+            self.initconds = None
+            self.algconds = None
+
+        # Set random seed if defined
+        if seed is not None:
+            np.random.seed(seed)
+
+        # Generate initial design matrix
+        init_design = _initdesign(levs=self.levs,ncs=self.N,cond=self.initconds)
+
+        return pd.DataFrame(init_design,columns=self.names)
+
     # Optimise
-    def optimise(self, cond: list = None, n_blocks: int = None, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
+    def optimise(self, init_design: pd.DataFrame, V: dict, model: str = 'mnl', draws: int = 1000, n_blocks: int = None, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
         """Create D-efficient RUM design
 
         Starts the optimisation of the design using a random swapping 
@@ -98,14 +109,14 @@ class RUMDesign:
 
         Parameters
         ----------
-        cond : list[str], optional
-            List of conditions that the final design must hold. Each element 
-            is a string that contains a single condition. Conditions 
-            can be of the form of binary relations (e.g., `X > Y` where `X` 
-            and `Y` are attributes of a specific alternative) or conditional 
-            relations (e.g., `if X > a then Y < b` where `a` and `b` are values).
-            Users can specify multiple conditions when the operator `if` is defined, 
-            separated by the operator `&`, by default None
+        initial_design : pandas.DataFrame
+            The initial design matrix as a Pandas DataFrame
+        V : dict
+            A dictionary with the utility function, using the same syntax as in Biogeme
+        model : str
+            The base model for the efficient design, by default 'mnl'
+        draws : int, optional
+            Number of draws for the Monte Carlo integration, by default 1000
         n_blocks : int, optional
             Number of blocks of the final design. Must be a multiple of the number of 
             choice situations, by default None
@@ -134,14 +145,6 @@ class RUMDesign:
         ubalance_ratio : float
             Utility balance ratio
         """
-        # Generate conditions if defined
-        if cond is not None:
-            initconds = _condgen('desmat',cond,self.names,init=True)
-            algconds = _condgen('swapdes',cond,self.names,init=False)
-        else:
-            initconds = None
-            algconds = None
-
         # Set random seed if defined
         if seed is not None:
             np.random.seed(seed)
@@ -157,23 +160,34 @@ class RUMDesign:
             time_lim = np.inf
 
         ############################################################
-        ########## Step 1: Generate initial design matrix ##########
+        ########## Step 1: Set initial design performance ##########
         ############################################################
 
-        # Generate 10 random designs
-        # Keep the one with best performance as initial design
         if verbose:
-            print('Generating the initial design matrix')
+            print('Evaluating initial design')
 
-        desmat = []
-        init_perf = np.inf
+        desmat = init_design
 
-        for _ in range(10):
-            desmat0 = _initdesign(names=self.names,levs=self.levs,avail=self.avail,ncs=self.N,cond=initconds)
-            perf0 = _derr(_imat_mnl,desmat0,self.levs,self.cods,self.pars,self.K,self.J,self.N,self.optout,self.asc)
-            if perf0 < init_perf:
-                desmat = desmat0.copy()
-                init_perf = perf0
+        models_ubalance = []
+        av = dict()
+        if model == 'mnl':
+            for k, _ in V.items():
+                av[k] = 1
+            model_object = loglogit(V,av,1)
+
+            for k, _ in V.items():
+                models_ubalance.append(logit(V,av,k))
+        elif model == 'mnl_bayesian':
+            for k, _ in V.items():
+                av[k] = 1
+            model_object = log(MonteCarlo(logit(V,av,1)))
+
+            for k, _ in V.items():
+                models_ubalance.append(MonteCarlo(logit(V,av,k)))
+        else:
+            raise ValueError("""Model name must be either 'mnl' or 'mnl_bayesian'""")
+
+        init_perf = _derr(desmat,model_object,draws)
 
         ############################################################
         ############## Step 2: Initialize algorighm ################
@@ -181,10 +195,10 @@ class RUMDesign:
 
         # Execute Swapping algorithm
         optimal_design, final_perf, final_iter, elapsed_time = _swapalg(
-            desmat,init_perf,self.K,self.J,self.N,self.levs,self.cods,self.pars,self.optout,self.asc,algconds,iter_lim,noimprov_lim,time_lim)
+            desmat,model_object,draws,init_perf,self.algconds,iter_lim,noimprov_lim,time_lim)
 
         # Compute utility balance ratio
-        ubalance_ratio = _utility_balance_mnl(optimal_design,self.levs,self.cods,self.pars,self.K,self.J,self.N,self.optout,self.asc)
+        ubalance_ratio = _utility_balance(pd.DataFrame(optimal_design,columns=self.names),models_ubalance,draws)
 
         ############################################################
         ############## Step 3: Arange final design #################
@@ -220,7 +234,7 @@ class RUMDesign:
         return optimal_design, init_perf, final_perf, final_iter, ubalance_ratio
 
     # Evaluate
-    def evaluate(self, design: pd.DataFrame):
+    def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl', draws: int = 1000):
         """Evaluate design
 
         Evaluates a design stored in a Pandas data frame
@@ -229,6 +243,10 @@ class RUMDesign:
         ----------
         design : pd.DataFrame
             Design to evaluate
+        V : dict
+            A dictionary with the utility function, using the same syntax as in Biogeme
+        model : str
+            The base model for the efficient design, by default 'mnl'
 
         Returns
         -------
@@ -238,17 +256,33 @@ class RUMDesign:
             Utility balance ratio
         """
         # Drop CS column and Block (if present) from pandas dataframe
-        desmat0 = design.drop('CS',axis=1)
+        desmat = design.drop('CS',axis=1)
 
-        if 'Block' in desmat0.columns:
-            desmat0 = desmat0.drop('Block',axis=1)
+        if 'Block' in desmat.columns:
+            desmat = desmat.drop('Block',axis=1)
 
-        # Convert to numpy array
-        desmat0 = desmat0.to_numpy()
+        models_ubalance = []
+        av = dict()
+        if model == 'mnl':
+            for k, _ in V.items():
+                av[k] = 1
+            model_object = loglogit(V,av,1)
 
+            for k, _ in V.items():
+                models_ubalance.append(logit(V,av,k))
+        elif model == 'mnl_bayesian':
+            for k, _ in V.items():
+                av[k] = 1
+            model_object = log(MonteCarlo(logit(V,av,1)))
+
+            for k, _ in V.items():
+                models_ubalance.append(MonteCarlo(logit(V,av,k)))
+        else:
+            raise ValueError("""Model name must be either 'mnl' or 'mnl_bayesian'""")
+        
         # Evaluate the performance and utility balance of the design
-        perf = _derr(_imat_mnl,desmat0,self.levs,self.cods,self.pars,self.K,self.J,self.N,self.optout,self.asc)
-        ubalance_ratio = _utility_balance_mnl(desmat0,self.levs,self.cods,self.pars,self.K,self.J,self.N,self.optout,self.asc)
+        perf = _derr(desmat,model_object,draws)
+        ubalance_ratio = _utility_balance(desmat,models_ubalance,draws)
 
         # Return performance and utility balance
         return perf, ubalance_ratio

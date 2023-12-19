@@ -99,18 +99,15 @@ def _condgen(desname: str, cond: list, names: list, init: bool = False):
     return conditions
 
 # Generate initial design matrix
-def _initdesign(names: list, levs: list, avail: list, ncs: int, cond: list):
+def _initdesign(levs: list, ncs: int, cond: list):
     """Generate initial design matrix"""
     # Create and populate the initial design matrix
     desmat = []
 
     # for k in levs:
     for k in range(len(levs)):
-        if avail[k] == 1:
-            col = np.array((levs[k] * int(np.ceil(ncs/len(levs[k]))))[:ncs])
-            np.random.shuffle(col)
-        else:
-            col = np.zeros(int(np.ceil(ncs/len(levs[k])))*len(levs[k]))[:ncs]
+        col = np.array((levs[k] * int(np.ceil(ncs/len(levs[k]))))[:ncs])
+        np.random.shuffle(col)
         desmat.append(col)
     
     desmat = np.array(desmat).T
@@ -130,10 +127,7 @@ def _initdesign(names: list, levs: list, avail: list, ncs: int, cond: list):
                 for _ in range(10000):
                     # Create a random vector of levels for the row in question
                     for k in range(len(levs)):
-                        if avail[k] == 1:
-                            desmat[i,k] = np.random.choice(levs[k])
-                        else:
-                            desmat[i,k] = 0
+                        desmat[i,k] = np.random.choice(levs[k])
                     
                     # Check if conditions are met with the new vector in the design.
                     check_all = []

@@ -3,14 +3,15 @@
 # Load modules
 import datetime
 import time
+import pandas as pd
 import numpy as np
-from choicedesign.criteria import _imat_mnl, _derr
+from biogeme.expressions import Expression
+from choicedesign.criteria import _derr
 
 # Swapping algorithm function
 def _swapalg(
-    design: np.ndarray,init_perf: float,
-    n_atts: int, n_alts: int, ncs: int,
-    levs: list, cods: list, pars: list, optout: bool, asc: dict, cond: list,
+    design: pd.DataFrame, model: Expression,draws: int,
+    init_perf: float, cond: list,
     iter_lim: float, noimprov_lim: float,time_lim: float):
     """Random swapping algorithm
 
@@ -22,8 +23,9 @@ def _swapalg(
     [1] Quan, W., Rose, J. M., Collins, A. T., & Bliemer, M. C. (2011). A comparison 
     of algorithms for generating efficient choice experiments.
     """
-    # Lock design matrix
-    desmat = design.copy()
+    # Lock design matrix and names
+    names = design.columns
+    desmat = design.to_numpy()
 
     # Start stopwatch
     t0 = time.time()
@@ -72,7 +74,7 @@ def _swapalg(
             
             # If all conditions are satisfied, compute D-error
             if check_all:
-                newperf = _derr(_imat_mnl,swapdes,levs,cods,pars,n_atts,n_alts,ncs,optout,asc)
+                newperf = _derr(pd.DataFrame(swapdes,columns=names),model,draws)
 
         # ...else if they do not differ, keep the D-error
         else:
@@ -102,4 +104,4 @@ def _swapalg(
         difftime = t1-t0
     
     # Return optimal design plus efficiency
-    return desmat, iterperf, t, difftime
+    return pd.DataFrame(desmat,columns=names), iterperf, t, difftime
