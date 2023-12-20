@@ -1,9 +1,13 @@
+0.1.5
+- Customisable utility functions
+- Allows for bayesian designs (experimental)
+
 0.1.4
-Added availability conditions
+- Added availability conditions
 
 0.1.2
-Corrected a bug on final utility balance
-Added evaluate() method
+- Corrected a bug on final utility balance
+- Added evaluate() method
 
 0.1.1
-First release
+- First release
