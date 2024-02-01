@@ -14,7 +14,8 @@ def _derr(design: pd.DataFrame, model: Expression,ndraws):
     _, _, im, _ = model.getValueAndDerivatives(database=Database('design',design),numberOfDraws=ndraws,aggregation=True,prepareIds=True,bhhh=False)
 
     # Calculate D-error
-    if np.linalg.det(im) != 0:
+    # if np.linalg.det(im) != 0:
+    if not np.isclose(np.linalg.det(im), 0):
         vce = np.linalg.solve(im,np.eye(im.shape[0]))
 
         # if asc is not None:
