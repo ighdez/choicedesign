@@ -35,6 +35,7 @@ class EffDesign:
             - `avail`: a list that details whether the attribute is part of 
             a specific alternative. Each element is one of the alternative 
             names of the parameter `alts`.
+            - `fixed`: a list of range of rows in which the attribute levels are fixed.
     """
 
     # Init method
@@ -48,12 +49,16 @@ class EffDesign:
         # Set names and levels
         self.names = []
         self.levs = []
+        self.fixed = []
 
         for j in alts:
             for k in atts_list:
                 if j in k['avail']:
                     self.names.append(j + '_' + k['name'])
                     self.levs.append(k['levels'])
+
+                # Set fixed rows
+                self.fixed.append(k['fixed'])
 
     # Generate initial design matrix
     def gen_initdesign(self,cond: list = None, seed: bool = None):
@@ -95,6 +100,9 @@ class EffDesign:
 
         # Generate initial design matrix
         init_design = _initdesign(levs=self.levs,ncs=self.N,cond=self.initconds)
+
+        for k in range(len(self.fixed)):
+            init_design[self.fixed[k],k] = 0
 
         return pd.DataFrame(init_design,columns=self.names)
 
@@ -195,7 +203,7 @@ class EffDesign:
 
         # Execute Swapping algorithm
         optimal_design, final_perf, final_iter, elapsed_time = _swapalg(
-            desmat,model_object,draws,init_perf,self.algconds,iter_lim,noimprov_lim,time_lim)
+            desmat,model_object,draws,init_perf,self.algconds,self.fixed,iter_lim,noimprov_lim,time_lim)
 
         # Compute utility balance ratio
         ubalance_ratio = _utility_balance(pd.DataFrame(optimal_design,columns=self.names),models_ubalance,draws)

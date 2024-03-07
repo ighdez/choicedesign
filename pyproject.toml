@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "choicedesign"
-version = "0.1.5"
+version = "0.1.6"
 description = "Experimental designs for discrete choice models."
 authors = ["José Ignacio Hernández <joseignaciohernandezh@gmail.com>"]
 readme = "README.md"
