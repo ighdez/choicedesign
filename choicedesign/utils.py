@@ -2,7 +2,8 @@
 
 # Import modules
 import numpy as np
-# from scipy.stats import chi2_contingency
+import pandas as pd
+from scipy.stats import chi2_contingency
 
 # Function for dummy generation
 def _dummygen(x,levs):
@@ -32,30 +33,31 @@ def _dummygen(x,levs):
 #     return np.array(tab)
 
 # Block generation function
-def _blockgen(design: np.ndarray, n_blocks: int, ncs: int, reps: int):
+def _blockgen(design: pd.DataFrame, n_blocks: int, reps: int):
     """Blocks generator"""
+
+    ncs = len(design)
+
     # Create array of blocks
     blocks = np.repeat(np.arange(n_blocks)+1,int(ncs/n_blocks))
-    # bestcorr = np.inf
-    # bestblock = blocks.copy()
-    
+
+    bestcorr = np.inf
+    bestblock = blocks.copy()
+
+    design_array = design.iloc[:,1:]
+
     for _ in range(reps):
         np.random.shuffle(blocks)
-        # blockmat = np.repeat(blocks,int(np.max(design[:,1]))).copy()
-        # sumcorr = 0
+        design_array['cand_block'] = blocks
+
+        sumcorr = design_array.corr()['cand_block'].sum()
         
-        # for a in range(2,design.shape[1]):
-        #     d = design[:,a].copy()
-        #     c = _cross(blockmat,d)
-        #     corr = chi2_contingency(c)[1]
-        #     sumcorr = sumcorr + corr
-        
-        # if sumcorr < bestcorr:
-        #     bestblock = blockmat.copy()
-        #     bestcorr = sumcorr
+        if sumcorr < bestcorr:
+            bestblock = blocks.copy()
+            bestcorr = sumcorr
 
     # return bestblock
-    return blocks
+    return bestblock
 
 # Condition generation function
 def _condgen(desname: str, cond: list, names: list, init: bool = False):

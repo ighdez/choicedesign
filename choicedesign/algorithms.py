@@ -11,7 +11,7 @@ from choicedesign.criteria import _derr
 # Swapping algorithm function
 def _swapalg(
     design: pd.DataFrame, model: Expression,draws: int,
-    init_perf: float, cond: list, fixed: list,
+    init_perf: float, cond: list,
     iter_lim: float, noimprov_lim: float,time_lim: float):
     """Random swapping algorithm
 
@@ -43,11 +43,8 @@ def _swapalg(
     # Initialize candidate swaps list
     candidate_swaps = []
     
-    for k in range(desmat.shape[1]):
-        if fixed[k] is None:
-            candidate_swaps.append(range(len(desmat)))
-        else:
-            candidate_swaps.append(fixed[k])
+    for _ in range(desmat.shape[1]):
+        candidate_swaps.append(range(len(desmat)))
 
     # Start algorithm
     while True:

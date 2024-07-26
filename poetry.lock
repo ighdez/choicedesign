@@ -464,6 +464,18 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
+name = "pydoe2"
+version = "1.3.0"
+description = "Design of experiments for Python"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+numpy = "*"
+scipy = "*"
+
+[[package]]
 name = "pygments"
 version = "2.17.2"
 description = "Pygments is a syntax highlighting package written in Python."
@@ -662,7 +674,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-ena
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "aa20eb3a38887f9fe6befd24f8b0b8ca11709086ea06afd36eaf2a5cd2ef6288"
+content-hash = "e9cf7a577eb6584bf0e59fa2b533ed5c337da9b921c4d3d211b720339f36a098"
 
 [metadata.files]
 appnope = [
@@ -734,6 +746,9 @@ py = [
 pycparser = [
     {file = "pycparser-2.21-py2.py3-none-any.whl", hash = "sha256:8ee45429555515e1f6b185e78100aea234072576aa43ab53aefcae078162fca9"},
     {file = "pycparser-2.21.tar.gz", hash = "sha256:e644fdec12f7872f86c58ff790da456218b10f863970249516d60a5eaca77206"},
+]
+pydoe2 = [
+    {file = "pyDOE2-1.3.0.tar.gz", hash = "sha256:5492b0f984af52da3af20b1cd61deb21b067c858e65243ec3ba573375f0d6720"},
 ]
 pygments = []
 pyparsing = [

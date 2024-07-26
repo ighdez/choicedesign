@@ -1,64 +1,44 @@
-"""Modules to construct efficient designs"""
+"""Modules to construct experimental designs"""
 
 # Import modules
-from re import L
-from unicodedata import name
 import pandas as pd
 import numpy as np
 import datetime
-from biogeme.expressions import Expression, MonteCarlo, log
+from typing import List
+from biogeme.expressions import MonteCarlo, log
 from biogeme.models import loglogit, logit
+from pyDOE2 import fullfact
 
+from choicedesign.expressions import Attribute
 from choicedesign.algorithms import _swapalg
 from choicedesign.criteria import _derr, _utility_balance
 from choicedesign.utils import _blockgen, _condgen, _initdesign
 
 # Efficient design
 class EffDesign:
-    """RUM-consistent discrete choice experiment design class
+    """Class for efficient designs for discrete choice experiments
 
     This class allows to create an efficient design for a discrete choice 
     experiment [1].
 
     Parameters
     ----------
-    alts : list
-        List of alternative names, to generate the design matrix
+    X : List[Attribute]
+        List of `Attribute` elements.
     ncs : int
         Number of choice situations.
-    atts_list : list[dict]
-        List of attributes of the design. Each element is a dictionary that 
-        contains the following keys:
-            
-            - `name`: the attribute name
-            - `levels`: a list of attribute levels
-            - `avail`: a list that details whether the attribute is part of 
-            a specific alternative. Each element is one of the alternative 
-            names of the parameter `alts`.
-            - `fixed`: a list of range of rows in which the attribute levels are fixed.
     """
 
     # Init method
-    def __init__(self,atts_list: list, alts: list, ncs: int):
+    def __init__(self, X: dict, ncs: int):
 
         # Define scalars
         self.N = ncs
-        self.J = len(alts)
-        self.K = len(atts_list)
+        self.J = len(X)
  
         # Set names and levels
-        self.names = []
-        self.levs = []
-        self.fixed = []
-
-        for j in alts:
-            for k in atts_list:
-                if j in k['avail']:
-                    self.names.append(j + '_' + k['name'])
-                    self.levs.append(k['levels'])
-
-                # Set fixed rows
-                self.fixed.append(k['fixed'])
+        self.names = [j.name for j in X]
+        self.levs = [j.levels for j in X]
 
     # Generate initial design matrix
     def gen_initdesign(self,cond: list = None, seed: bool = None):
@@ -101,13 +81,10 @@ class EffDesign:
         # Generate initial design matrix
         init_design = _initdesign(levs=self.levs,ncs=self.N,cond=self.initconds)
 
-        for k in range(len(self.fixed)):
-            init_design[self.fixed[k],k] = 0
-
         return pd.DataFrame(init_design,columns=self.names)
 
     # Optimise
-    def optimise(self, init_design: pd.DataFrame, V: dict, model: str = 'mnl', draws: int = 1000, n_blocks: int = None, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
+    def optimise(self, init_design: pd.DataFrame, V: dict, model: str = 'mnl', draws: int = 1000, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
         """Create D-efficient RUM design
 
         Starts the optimisation of the design using a random swapping 
@@ -203,7 +180,7 @@ class EffDesign:
 
         # Execute Swapping algorithm
         optimal_design, final_perf, final_iter, elapsed_time = _swapalg(
-            desmat,model_object,draws,init_perf,self.algconds,self.fixed,iter_lim,noimprov_lim,time_lim)
+            desmat,model_object,draws,init_perf,self.algconds,iter_lim,noimprov_lim,time_lim)
 
         # Compute utility balance ratio
         ubalance_ratio = _utility_balance(pd.DataFrame(optimal_design,columns=self.names),models_ubalance,draws)
@@ -216,17 +193,17 @@ class EffDesign:
         optimal_design = np.c_[np.arange(self.N)+1,optimal_design]
 
         # Generate blocks
-        if n_blocks is not None:
-            if verbose:
-                print('\nGenerating ' + str(n_blocks) + ' blocks...')
-            blocksrow = _blockgen(optimal_design,n_blocks,self.N,1000)
-            optimal_design = np.c_[optimal_design,blocksrow]
+        # if n_blocks is not None:
+        #     if verbose:
+        #         print('\nGenerating ' + str(n_blocks) + ' blocks...')
+        #     blocksrow = _blockgen(optimal_design,n_blocks,self.N,1000)
+        #     optimal_design = np.c_[optimal_design,blocksrow]
 
         # Create Pandas DataFrame
-        if n_blocks is not None:
-            optimal_design = pd.DataFrame(optimal_design,columns=['CS'] + self.names + ['Block'])
-        else:
-            optimal_design = pd.DataFrame(optimal_design,columns=['CS'] + self.names)
+        # if n_blocks is not None:
+        #     optimal_design = pd.DataFrame(optimal_design,columns=['CS'] + self.names + ['Block'])
+        # else:
+        optimal_design = pd.DataFrame(optimal_design,columns=['CS'] + self.names)
 
         # Return a summary if verbose is True
         if verbose:
@@ -240,6 +217,31 @@ class EffDesign:
         
         # Return the optimal design
         return optimal_design, init_perf, final_perf, final_iter, ubalance_ratio
+
+    # Generate blocks
+    def gen_blocks(self, design: pd.DataFrame, n_blocks: int, n_iter: int = 1000):
+        """Generate blocks
+
+        Generate blocks for a design, based on minimising the correlation between the block column and all attributes
+
+        Parameters
+        ----------
+        design : pd.DataFrame
+            Design matrix
+        n_blocks : int
+            Number of blocks
+        n_blocks : int
+            Number of iterations of the minsum algorithm, default 1000
+
+        Returns
+        -------
+        design : pd.DataFrame
+            Optimal design with the block column
+        """
+        blocksrow = _blockgen(design,n_blocks,n_iter)
+        design['Block'] = blocksrow
+
+        return design
 
     # Evaluate
     def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl', draws: int = 1000):
@@ -294,3 +296,30 @@ class EffDesign:
 
         # Return performance and utility balance
         return perf, ubalance_ratio
+    
+# Class for Full-factorial design
+class FullFactDesign:
+    # Init method
+    def __init__(self, X: dict):
+ 
+        # Set names and levels
+        self.names = [j.name for j in X]
+        self.levs = [j.levels for j in X]
+
+        self.J = len(X)
+        self.K = len(self.levs)
+
+    # Generate design matrix
+    def gen_design(self):
+        # Generate default full-fact design
+        n_levels = [len(j) for j in self.levs]
+        init_design = fullfact(n_levels)
+
+        # Create pandas dataframe
+        init_design = pd.DataFrame(init_design.astype(int),columns=self.names)
+
+        # Replace values with the actual attribute levels
+        for k in range(self.K):
+            init_design.iloc[:,k].replace(np.arange(n_levels[k]),self.levs[k],inplace=True)
+
+        return init_design

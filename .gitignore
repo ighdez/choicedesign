@@ -1,1 +1,7 @@
 dist/
+choicedesign/__pycache__/__init__.cpython-39.pyc
+choicedesign/__pycache__/algorithms.cpython-39.pyc
+choicedesign/__pycache__/criteria.cpython-39.pyc
+choicedesign/__pycache__/design.cpython-39.pyc
+choicedesign/__pycache__/expressions.cpython-39.pyc
+choicedesign/__pycache__/utils.cpython-39.pyc
