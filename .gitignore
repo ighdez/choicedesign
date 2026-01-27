@@ -5,3 +5,5 @@ choicedesign/__pycache__/criteria.cpython-39.pyc
 choicedesign/__pycache__/design.cpython-39.pyc
 choicedesign/__pycache__/expressions.cpython-39.pyc
 choicedesign/__pycache__/utils.cpython-39.pyc
+examples/d_efficient_rum_cs_avail.ipynb
+examples/fullfact_simple.ipynb

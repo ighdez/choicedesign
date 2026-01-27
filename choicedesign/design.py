@@ -7,7 +7,7 @@ import datetime
 from typing import List
 from biogeme.expressions import MonteCarlo, log
 from biogeme.models import loglogit, logit
-from pyDOE2 import fullfact
+# from pyDOE2 import fullfact
 
 from choicedesign.expressions import Attribute
 from choicedesign.algorithms import _swapalg
@@ -298,28 +298,28 @@ class EffDesign:
         return perf, ubalance_ratio
     
 # Class for Full-factorial design
-class FullFactDesign:
-    # Init method
-    def __init__(self, X: dict):
+# class FullFactDesign:
+#     # Init method
+#     def __init__(self, X: dict):
  
-        # Set names and levels
-        self.names = [j.name for j in X]
-        self.levs = [j.levels for j in X]
+#         # Set names and levels
+#         self.names = [j.name for j in X]
+#         self.levs = [j.levels for j in X]
 
-        self.J = len(X)
-        self.K = len(self.levs)
+#         self.J = len(X)
+#         self.K = len(self.levs)
 
-    # Generate design matrix
-    def gen_design(self):
-        # Generate default full-fact design
-        n_levels = [len(j) for j in self.levs]
-        init_design = fullfact(n_levels)
+#     # Generate design matrix
+#     def gen_design(self):
+#         # Generate default full-fact design
+#         n_levels = [len(j) for j in self.levs]
+#         init_design = fullfact(n_levels)
 
-        # Create pandas dataframe
-        init_design = pd.DataFrame(init_design.astype(int),columns=self.names)
+#         # Create pandas dataframe
+#         init_design = pd.DataFrame(init_design.astype(int),columns=self.names)
 
-        # Replace values with the actual attribute levels
-        for k in range(self.K):
-            init_design.iloc[:,k].replace(np.arange(n_levels[k]),self.levs[k],inplace=True)
+#         # Replace values with the actual attribute levels
+#         for k in range(self.K):
+#             init_design.iloc[:,k].replace(np.arange(n_levels[k]),self.levs[k],inplace=True)
 
-        return init_design
+#         return init_design
