@@ -16,7 +16,7 @@ The main features of ChoiceDesign are:
 
 * D-efficient designs based on a random swapping algorithm
 * **Customisable utility functions** (powered by [Biogeme](https://biogeme.epfl.ch/))
-* Bayesian priors *(experimental)*
+<!-- * Bayesian priors *(experimental)* -->
 * Designs with conditions over different attribute levels
 * Designs with blocks.
 * Multiple stopping criteria (Fixed number of iterations, iterations without improvement or fixed time).
