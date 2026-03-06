@@ -3,7 +3,6 @@
 # Import modules
 import numpy as np
 import pandas as pd
-from scipy.stats import chi2_contingency
 
 # Function for dummy generation
 def _dummygen(x,levs):

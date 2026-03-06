@@ -1,3 +1,9 @@
+0.2.2
+- Expressions are coded from scratch. Biogeme expressions are not needed anymore
+
+0.2.1
+- Bayesian designs reverted till proper implementation
+
 0.1.6
 - Added support for fixed columns
 

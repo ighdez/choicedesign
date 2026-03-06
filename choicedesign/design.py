@@ -5,13 +5,10 @@ import pandas as pd
 import numpy as np
 import datetime
 from typing import List
-from biogeme.expressions import MonteCarlo, log
-from biogeme.models import loglogit, logit
-# from pyDOE2 import fullfact
 
 from choicedesign.expressions import Attribute
 from choicedesign.algorithms import _swapalg
-from choicedesign.criteria import _derr, _utility_balance
+from choicedesign.criteria import MNLModel, _derr, _utility_balance
 from choicedesign.utils import _blockgen, _condgen, _initdesign
 
 # Efficient design
@@ -84,7 +81,7 @@ class EffDesign:
         return pd.DataFrame(init_design,columns=self.names)
 
     # Optimise
-    def optimise(self, init_design: pd.DataFrame, V: dict, model: str = 'mnl', draws: int = 1000, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
+    def optimise(self, init_design: pd.DataFrame, V: dict, model: str = 'mnl', iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
         """Create D-efficient RUM design
 
         Starts the optimisation of the design using a random swapping 
@@ -97,14 +94,10 @@ class EffDesign:
         initial_design : pandas.DataFrame
             The initial design matrix as a Pandas DataFrame
         V : dict
-            A dictionary with the utility function, using the same syntax as in Biogeme
+            A dictionary with the utility functions, keyed by alternative index.
+            e.g. ``{1: V1, 2: V2}``
         model : str
             The base model for the efficient design, by default 'mnl'
-        draws : int, optional
-            Number of draws for the Monte Carlo integration, by default 1000
-        n_blocks : int, optional
-            Number of blocks of the final design. Must be a multiple of the number of 
-            choice situations, by default None
         iter_lim : int, optional
             Number of iterations before the algorithm stops, by default None
         noimprov_lim : int, optional
@@ -153,26 +146,12 @@ class EffDesign:
 
         desmat = init_design
 
-        models_ubalance = []
-        av = dict()
         if model == 'mnl':
-            for k, _ in V.items():
-                av[k] = 1
-            model_object = loglogit(V,av,1)
-
-            for k, _ in V.items():
-                models_ubalance.append(logit(V,av,k))
-        elif model == 'mnl_bayesian':
-            for k, _ in V.items():
-                av[k] = 1
-            model_object = log(MonteCarlo(logit(V,av,1)))
-
-            for k, _ in V.items():
-                models_ubalance.append(MonteCarlo(logit(V,av,k)))
+            model_object = MNLModel(V)
         else:
-            raise ValueError("""Model name must be either 'mnl' or 'mnl_bayesian'""")
+            raise ValueError("Model name must be 'mnl'")
 
-        init_perf = _derr(desmat,model_object,draws)
+        init_perf = _derr(desmat, model_object)
 
         ############################################################
         ############## Step 2: Initialize algorighm ################
@@ -180,10 +159,10 @@ class EffDesign:
 
         # Execute Swapping algorithm
         optimal_design, final_perf, final_iter, elapsed_time = _swapalg(
-            desmat,model_object,draws,init_perf,self.algconds,iter_lim,noimprov_lim,time_lim)
+            desmat, model_object, init_perf, self.algconds, iter_lim, noimprov_lim, time_lim)
 
         # Compute utility balance ratio
-        ubalance_ratio = _utility_balance(pd.DataFrame(optimal_design,columns=self.names),models_ubalance,draws)
+        ubalance_ratio = _utility_balance(pd.DataFrame(optimal_design, columns=self.names), model_object)
 
         ############################################################
         ############## Step 3: Arange final design #################
@@ -244,7 +223,7 @@ class EffDesign:
         return design
 
     # Evaluate
-    def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl', draws: int = 1000):
+    def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl'):
         """Evaluate design
 
         Evaluates a design stored in a Pandas data frame
@@ -271,28 +250,14 @@ class EffDesign:
         if 'Block' in desmat.columns:
             desmat = desmat.drop('Block',axis=1)
 
-        models_ubalance = []
-        av = dict()
         if model == 'mnl':
-            for k, _ in V.items():
-                av[k] = 1
-            model_object = loglogit(V,av,1)
-
-            for k, _ in V.items():
-                models_ubalance.append(logit(V,av,k))
-        elif model == 'mnl_bayesian':
-            for k, _ in V.items():
-                av[k] = 1
-            model_object = log(MonteCarlo(logit(V,av,1)))
-
-            for k, _ in V.items():
-                models_ubalance.append(MonteCarlo(logit(V,av,k)))
+            model_object = MNLModel(V)
         else:
-            raise ValueError("""Model name must be either 'mnl' or 'mnl_bayesian'""")
-        
+            raise ValueError("Model name must be 'mnl'")
+
         # Evaluate the performance and utility balance of the design
-        perf = _derr(desmat,model_object,draws)
-        ubalance_ratio = _utility_balance(desmat,models_ubalance,draws)
+        perf = _derr(desmat, model_object)
+        ubalance_ratio = _utility_balance(desmat, model_object)
 
         # Return performance and utility balance
         return perf, ubalance_ratio

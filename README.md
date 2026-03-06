@@ -2,8 +2,6 @@
 
 **ChoiceDesign** is a Python package tool to construct D-efficient designs for Discrete Choice Experiments. ChoiceDesign combines enough flexibility to construct from simple 2-alternative designs with few attributes, to more complex settings that may involve conditions between attributes. ChoiceDesign is a revamped version of [EDT](https://github.com/ighdez/EDT), a project I created some years ago for the same purpose. ChoiceDesign includes improvements over EDT such as class-based syntax, coding improvements, better documentation and making this package available to install via `pip`.
 
-**NEW:** ChoiceDesign now integrates [Biogeme](https://biogeme.epfl.ch/), which allows you to customise the utility functions.
-
 ## Installation
 
 ChoiceDesign is available to install via the regular syntax of `pip`:
@@ -15,7 +13,7 @@ ChoiceDesign is available to install via the regular syntax of `pip`:
 The main features of ChoiceDesign are:
 
 * D-efficient designs based on a random swapping algorithm
-* **Customisable utility functions** (powered by [Biogeme](https://biogeme.epfl.ch/))
+* **Customisable utility functions** (inspired by [Biogeme](https://biogeme.epfl.ch/). In previous versions, I relied on Biogeme functions. Now they're rewritten from scratch)
 <!-- * Bayesian priors *(experimental)* -->
 * Designs with conditions over different attribute levels
 * Designs with blocks.
