@@ -134,19 +134,25 @@ class Attribute(Expression):
 
 
 class Parameter(Expression):
-    """A model parameter with a fixed prior value.
+    """A model parameter with a prior value.
 
     Parameters
     ----------
     name : str
         Parameter name.
     prior : float
-        Prior (point) value used in D-efficient design.
+        Prior (point) value used in D-efficient design. For Bayesian
+        (Db-efficient) designs this is the mean of the prior distribution.
+    prior_std : float, optional
+        Standard deviation of the normal prior distribution. When set,
+        the parameter is treated as uncertain and participates in Db-error
+        averaging. ``None`` (default) means a fixed point prior.
     """
 
-    def __init__(self, name: str, prior: float):
+    def __init__(self, name: str, prior: float, prior_std: float = None):
         self.name = name
         self.prior = prior
+        self.prior_std = prior_std
 
     def evaluate(self, data=None, draws=None):
         return np.float64(self.prior)

@@ -191,6 +191,56 @@ def _derr(design: pd.DataFrame, model: MNLModel) -> float:
     return np.inf
 
 
+def _db_derr(
+    design: pd.DataFrame,
+    model: MNLModel,
+    n_draws: int,
+    rng: np.random.Generator,
+) -> float:
+    """Db-error of a design: expected D-error over uncertain prior distributions.
+
+    For each parameter with a ``prior_std`` set, draws are taken from
+    ``Normal(prior, prior_std)``.  The D-error is evaluated for every draw
+    and the mean is returned as the Db-error.  Parameters without
+    ``prior_std`` (or with ``prior_std=None``) are held fixed.
+
+    Parameters
+    ----------
+    design : pd.DataFrame
+        Design matrix.
+    model : MNLModel
+        Pre-compiled MNL model.
+    n_draws : int
+        Number of Monte Carlo draws from the prior distributions.
+    rng : np.random.Generator
+        NumPy random generator. Pass a single instance from the caller so
+        that the full optimisation run uses one coherent random stream.
+
+    Returns
+    -------
+    float
+    """
+    uncertain = [p for p in model.params if getattr(p, 'prior_std', None)]
+
+    if not uncertain:
+        return _derr(design, model)
+
+    # Store the user-specified prior means before any mutation
+    prior_means = {p: p.prior for p in uncertain}
+
+    total = 0.0
+    for _ in range(n_draws):
+        for p in uncertain:
+            p.prior = rng.normal(prior_means[p], p.prior_std)
+        total += _derr(design, model)
+
+    # Restore original prior means
+    for p in uncertain:
+        p.prior = prior_means[p]
+
+    return total / n_draws
+
+
 def _utility_balance(design: pd.DataFrame, model: MNLModel) -> float:
     """Utility balance ratio of a design.
 

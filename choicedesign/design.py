@@ -8,7 +8,7 @@ from typing import List
 
 from choicedesign.expressions import Attribute
 from choicedesign.algorithms import _swapalg
-from choicedesign.criteria import MNLModel, _derr, _utility_balance
+from choicedesign.criteria import MNLModel, _derr, _db_derr, _utility_balance
 from choicedesign.utils import _blockgen, _condgen, _initdesign
 
 # Efficient design
@@ -81,7 +81,7 @@ class EffDesign:
         return pd.DataFrame(init_design,columns=self.names)
 
     # Optimise
-    def optimise(self, init_design: pd.DataFrame, V: dict, model: str = 'mnl', iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
+    def optimise(self, init_design: pd.DataFrame, V: dict, model: str = 'mnl', bayes_draws: int = None, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
         """Create D-efficient RUM design
 
         Starts the optimisation of the design using a random swapping 
@@ -98,6 +98,12 @@ class EffDesign:
             e.g. ``{1: V1, 2: V2}``
         model : str
             The base model for the efficient design, by default 'mnl'
+        bayes_draws : int, optional
+            Number of Monte Carlo draws for Db-efficient (Bayesian) design.
+            When set, the optimizer minimises the expected D-error averaged
+            over draws from the prior distributions of parameters that have
+            ``prior_std`` defined. When ``None`` (default), standard point
+            D-error is used.
         iter_lim : int, optional
             Number of iterations before the algorithm stops, by default None
         noimprov_lim : int, optional
@@ -151,7 +157,13 @@ class EffDesign:
         else:
             raise ValueError("Model name must be 'mnl'")
 
-        init_perf = _derr(desmat, model_object)
+        if bayes_draws is not None:
+            rng = np.random.default_rng(seed)
+            derr_fn = lambda design, model: _db_derr(design, model, bayes_draws, rng)
+        else:
+            derr_fn = _derr
+
+        init_perf = derr_fn(desmat, model_object)
 
         ############################################################
         ############## Step 2: Initialize algorighm ################
@@ -159,7 +171,7 @@ class EffDesign:
 
         # Execute Swapping algorithm
         optimal_design, final_perf, final_iter, elapsed_time = _swapalg(
-            desmat, model_object, init_perf, self.algconds, iter_lim, noimprov_lim, time_lim)
+            desmat, model_object, init_perf, self.algconds, iter_lim, noimprov_lim, time_lim, derr_fn)
 
         # Compute utility balance ratio
         ubalance_ratio = _utility_balance(pd.DataFrame(optimal_design, columns=self.names), model_object)
@@ -223,7 +235,7 @@ class EffDesign:
         return design, corr_list
 
     # Evaluate
-    def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl'):
+    def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl', bayes_draws: int = None, seed: int = None):
         """Evaluate design
 
         Evaluates a design stored in a Pandas data frame
@@ -233,14 +245,21 @@ class EffDesign:
         design : pd.DataFrame
             Design to evaluate
         V : dict
-            A dictionary with the utility function, using the same syntax as in Biogeme
+            A dictionary with the utility function.
         model : str
             The base model for the efficient design, by default 'mnl'
+        bayes_draws : int, optional
+            Number of Monte Carlo draws for Db-error evaluation. When set,
+            returns the expected D-error over prior distributions of
+            parameters that have ``prior_std`` defined. When ``None``
+            (default), returns the standard point D-error.
+        seed : int, optional
+            Random seed for Bayesian draws, by default None
 
         Returns
         -------
         perf : float
-            The D-error of the design
+            The D-error (or Db-error) of the design
         ubalance_ratio : float
             Utility balance ratio
         """
@@ -256,7 +275,11 @@ class EffDesign:
             raise ValueError("Model name must be 'mnl'")
 
         # Evaluate the performance and utility balance of the design
-        perf = _derr(desmat, model_object)
+        if bayes_draws is not None:
+            rng = np.random.default_rng(seed)
+            perf = _db_derr(desmat, model_object, bayes_draws, rng)
+        else:
+            perf = _derr(desmat, model_object)
         ubalance_ratio = _utility_balance(desmat, model_object)
 
         # Return performance and utility balance
