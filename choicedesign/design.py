@@ -217,10 +217,10 @@ class EffDesign:
         design : pd.DataFrame
             Optimal design with the block column
         """
-        blocksrow = _blockgen(design,n_blocks,n_iter)
+        blocksrow, corr_list = _blockgen(design,n_blocks,n_iter)
         design['Block'] = blocksrow
 
-        return design
+        return design, corr_list
 
     # Evaluate
     def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl'):
