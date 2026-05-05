@@ -1,4 +1,15 @@
-"""Modules to construct experimental designs"""
+"""Classes for constructing efficient experimental designs.
+
+The main user-facing class is :class:`EffDesign`, which combines initial
+design generation, constrained random-swap optimisation, and optional blocking.
+
+Typical workflow::
+
+    design = EffDesign(X=[alt1_A, alt2_A], ncs=18)
+    init   = design.gen_initdesign(cond=['alt1_A > alt2_A'], seed=42)
+    result = design.optimise(init, V={1: V1, 2: V2}, time_lim=1)
+    # result = (optimal_design, init_derr, final_derr, n_iter, utility_balance)
+"""
 
 # Import modules
 import itertools
@@ -14,17 +25,30 @@ from choicedesign.utils import _blockgen, _parse_condition, _initdesign
 
 # Efficient design
 class EffDesign:
-    """Class for efficient designs for discrete choice experiments
+    """Efficient design for a discrete choice experiment.
 
-    This class allows to create an efficient design for a discrete choice 
-    experiment [1].
+    Combines initial design generation, random-swap optimisation, and
+    optional blocking in a single object.
 
     Parameters
     ----------
-    X : List[Attribute]
-        List of `Attribute` elements.
+    X : list[Attribute]
+        Ordered list of :class:`~choicedesign.expressions.Attribute` objects
+        that define the design columns and their discrete levels.
     ncs : int
-        Number of choice situations.
+        Number of choice situations (rows) in the design matrix.
+
+    Examples
+    --------
+    >>> from choicedesign.design import EffDesign
+    >>> from choicedesign.expressions import Attribute, Parameter
+    >>> alt1_A = Attribute('alt1_A', [1, 2, 3])
+    >>> alt2_A = Attribute('alt2_A', [1, 2, 3])
+    >>> beta_A  = Parameter('beta_A', -0.1)
+    >>> V = {1: beta_A * alt1_A, 2: beta_A * alt2_A}
+    >>> design = EffDesign(X=[alt1_A, alt2_A], ncs=18)
+    >>> init   = design.gen_initdesign(seed=42)
+    >>> result = design.optimise(init, V=V, iter_lim=500)
     """
 
     # Init method
@@ -81,17 +105,17 @@ class EffDesign:
 
     # Optimise
     def optimise(self, init_design: pd.DataFrame, V: dict, model: str = 'mnl', algorithm: str = 'swap', criterion: str = 'd', cost_param=None, wtp_params=None, bayes_draws: int = None, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
-        """Create D-efficient RUM design
+        """Optimise the design using a random-search algorithm.
 
-        Starts the optimisation of the design using a random swapping 
-        algorithm and the attributes and prior parameters specified in 
-        the `RUMDesign` object. Allows for conditions, blocking and 
-        user-defined stopping criteria.
+        Starts from an initial design and iteratively improves it according
+        to the selected criterion and stopping rules. At least one stopping
+        criterion (``iter_lim``, ``noimprov_lim``, or ``time_lim``) must be
+        supplied.
 
         Parameters
         ----------
-        initial_design : pandas.DataFrame
-            The initial design matrix as a Pandas DataFrame
+        init_design : pandas.DataFrame
+            The initial design matrix, typically from :meth:`gen_initdesign`.
         V : dict
             A dictionary with the utility functions, keyed by alternative index.
             e.g. ``{1: V1, 2: V2}``
@@ -248,23 +272,27 @@ class EffDesign:
 
     # Generate blocks
     def gen_blocks(self, design: pd.DataFrame, n_blocks: int, n_iter: int = 1000):
-        """Generate blocks
+        """Assign choice situations to blocks.
 
-        Generate blocks for a design, based on minimising the correlation between the block column and all attributes
+        Minimises the correlation between the block assignment and all
+        attribute columns by evaluating ``n_iter`` random permutations and
+        keeping the best one.
 
         Parameters
         ----------
-        design : pd.DataFrame
-            Design matrix
+        design : pandas.DataFrame
+            Optimised design from :meth:`optimise` (must include a ``CS`` column).
         n_blocks : int
-            Number of blocks
-        n_blocks : int
-            Number of iterations of the minsum algorithm, default 1000
+            Number of blocks.
+        n_iter : int, optional
+            Number of random permutations evaluated by the search, by default 1000.
 
         Returns
         -------
-        design : pd.DataFrame
-            Optimal design with the block column
+        design : pandas.DataFrame
+            Design with an additional ``Block`` column.
+        corr_list : list[float]
+            History of best total absolute correlation found at each improvement.
         """
         blocksrow, corr_list = _blockgen(design,n_blocks,n_iter)
         design['Block'] = blocksrow
@@ -343,15 +371,17 @@ class EffDesign:
         return perf, ubalance_ratio
     
 class FullFactDesign:
-    """Class for full-factorial designs
-
-    Generates a full-factorial design matrix covering all combinations of
-    attribute levels.
+    """Full-factorial design covering all combinations of attribute levels.
 
     Parameters
     ----------
-    X : List[Attribute]
-        List of `Attribute` elements.
+    X : list[Attribute]
+        List of :class:`~choicedesign.expressions.Attribute` objects.
+
+    Notes
+    -----
+    This class is provided for completeness. Its dependency ``pyDOE2`` is
+    incompatible with Python 3.12+ and is not installed by default.
     """
 
     def __init__(self, X: list):

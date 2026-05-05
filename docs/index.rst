@@ -14,3 +14,7 @@ Welcome to ChoiceDesign's documentation!
    :toctree: generated
 
    choicedesign.design
+   choicedesign.expressions
+   choicedesign.criteria
+   choicedesign.algorithms
+   choicedesign.utils

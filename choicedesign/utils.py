@@ -1,4 +1,12 @@
-"""Utilitary functions"""
+"""Utility functions for design generation and condition handling.
+
+Contains helpers for:
+
+- Generating balanced initial random designs (``_initdesign``).
+- Parsing condition strings into callable predicates (``_parse_condition``).
+- Searching for block assignments that minimise attribute correlation (``_blockgen``).
+- Dummy-coding categorical attribute columns (``_dummygen``).
+"""
 
 # Import modules
 import re
@@ -6,8 +14,22 @@ import numpy as np
 import pandas as pd
 
 # Function for dummy generation
-def _dummygen(x,levs):
-    """Generate dummy variables"""
+def _dummygen(x, levs):
+    """Generate dummy variables for a categorical attribute column.
+
+    Parameters
+    ----------
+    x : np.ndarray, shape (n,)
+        Column of observed attribute values.
+    levs : list
+        Ordered list of all attribute levels. The first level is the
+        reference category and is excluded from the output.
+
+    Returns
+    -------
+    np.ndarray, shape (n, len(levs) - 1)
+        Binary indicator matrix (1 where ``x == level``, 0 otherwise).
+    """
     n_levs = len(levs)
 
     converted_array = np.empty((x.shape[0],n_levs-1))
@@ -34,7 +56,25 @@ def _dummygen(x,levs):
 
 # Block generation function
 def _blockgen(design: pd.DataFrame, n_blocks: int, reps: int):
-    """Blocks generator"""
+    """Search for a block assignment that minimises attribute correlation.
+
+    Parameters
+    ----------
+    design : pandas.DataFrame
+        Optimised design (must include a ``CS`` column in position 0,
+        which is skipped when computing correlations).
+    n_blocks : int
+        Number of blocks. Must divide evenly into ``len(design)``.
+    reps : int
+        Number of random permutations to evaluate.
+
+    Returns
+    -------
+    bestblock : np.ndarray, shape (ncs,)
+        Block labels (1-indexed) for each choice situation.
+    corr_list : list[float]
+        Running best total absolute correlation at each improvement step.
+    """
 
     ncs = len(design)
 

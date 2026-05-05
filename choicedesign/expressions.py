@@ -1,4 +1,30 @@
-"""ChoiceDesign native expression system"""
+"""Symbolic expression system for ChoiceDesign utility functions.
+
+All expression nodes support arithmetic operators (``+``, ``-``, ``*``, ``/``,
+``**``, unary ``-``) and comparison operators (``==``, ``!=``, ``<``, ``<=``,
+``>``, ``>=``).  Comparison operators return indicator expressions (1.0 / 0.0)
+rather than Python booleans, enabling dummy-coded attributes::
+
+    beta_A_2 * (alt1_A == 2) + beta_A_3 * (alt1_A == 3)
+
+Every node implements symbolic differentiation via
+:meth:`Expression.differentiate`, used by
+:class:`~choicedesign.criteria.MNLModel` to build the Fisher information matrix
+without numerical approximation.
+
+User-facing classes
+-------------------
+:class:`Attribute`
+    A design column (attribute with discrete levels).
+:class:`Parameter`
+    A model parameter with a prior value.
+:class:`ASC`
+    An alternative-specific constant (excluded from D-error).
+:func:`exp`, :func:`log`
+    Symbolic exponential and logarithm.
+:func:`get_unique_params`
+    Extract unique parameters from a utility-function dict.
+"""
 
 import numpy as np
 from typing import Union, List
@@ -91,7 +117,13 @@ class Expression:
 # ---------------------------------------------------------------------------
 
 class Constant(Expression):
-    """A fixed numeric constant."""
+    """A fixed numeric constant.
+
+    Parameters
+    ----------
+    value : float
+        The numeric value wrapped in the expression tree.
+    """
 
     def __init__(self, value: float):
         self.value = value
@@ -112,9 +144,16 @@ class Attribute(Expression):
     Parameters
     ----------
     name : str
-        Column name as it appears in the design DataFrame.
-    levels : list
-        Discrete levels this attribute can take.
+        Column name as it will appear in the design DataFrame.
+    levels : list or int
+        Discrete levels this attribute can take.  Pass a list of values
+        (e.g. ``[100, 200, 300]``) or an integer *n* to get levels
+        ``[0, 1, ..., n-1]``.
+
+    Examples
+    --------
+    >>> cost = Attribute('cost', [100, 200, 300])
+    >>> dummy_attr = Attribute('mode', 3)  # levels = [0, 1, 2]
     """
 
     def __init__(self, name: str, levels: Union[int, list]):
@@ -144,9 +183,14 @@ class Parameter(Expression):
         Prior (point) value used in D-efficient design. For Bayesian
         (Db-efficient) designs this is the mean of the prior distribution.
     prior_std : float, optional
-        Standard deviation of the normal prior distribution. When set,
-        the parameter is treated as uncertain and participates in Db-error
+        Standard deviation of the normal prior distribution. When set, the
+        parameter is treated as uncertain and participates in Db-error
         averaging. ``None`` (default) means a fixed point prior.
+
+    Examples
+    --------
+    >>> beta_cost = Parameter('beta_cost', -0.01)
+    >>> beta_time = Parameter('beta_time', -0.05, prior_std=0.02)
     """
 
     def __init__(self, name: str, prior: float, prior_std: float = None):
@@ -172,16 +216,21 @@ class Parameter(Expression):
 class ASC(Parameter):
     """Alternative-specific constant.
 
-    Identical to Parameter but semantically tagged as a constant
-    term (not multiplied by an attribute). The prior should reflect
-    the expected market share of the alternative.
+    Identical to :class:`Parameter` but semantically tagged so that the
+    optimiser excludes it from the D-error computation (ASCs are not part of
+    the design being optimised). The prior should reflect the expected log-odds
+    of choosing that alternative.
 
     Parameters
     ----------
     name : str
         Constant name.
     prior : float
-        Prior value.
+        Prior value (typically derived from market-share expectations).
+
+    Examples
+    --------
+    >>> asc_1 = ASC('asc_1', 0.5)
     """
 
     def __init__(self, name: str, prior: float):
@@ -199,6 +248,8 @@ class ASC(Parameter):
 # ---------------------------------------------------------------------------
 
 class Add(Expression):
+    """Expression node for addition (``left + right``)."""
+
     def __init__(self, left: Expression, right: Expression):
         self.left = left
         self.right = right
@@ -217,6 +268,8 @@ class Add(Expression):
 
 
 class Sub(Expression):
+    """Expression node for subtraction (``left - right``)."""
+
     def __init__(self, left: Expression, right: Expression):
         self.left = left
         self.right = right
@@ -235,6 +288,8 @@ class Sub(Expression):
 
 
 class Mul(Expression):
+    """Expression node for multiplication (``left * right``)."""
+
     def __init__(self, left: Expression, right: Expression):
         self.left = left
         self.right = right
@@ -257,6 +312,8 @@ class Mul(Expression):
 
 
 class Div(Expression):
+    """Expression node for division (``left / right``)."""
+
     def __init__(self, left: Expression, right: Expression):
         self.left = left
         self.right = right
@@ -282,6 +339,8 @@ class Div(Expression):
 
 
 class Pow(Expression):
+    """Expression node for exponentiation (``base ** exponent``)."""
+
     def __init__(self, base: Expression, exponent: Expression):
         self.base = base
         self.exponent = exponent
@@ -307,6 +366,8 @@ class Pow(Expression):
 
 
 class Neg(Expression):
+    """Expression node for unary negation (``-expr``)."""
+
     def __init__(self, expr: Expression):
         self.expr = expr
 
@@ -343,6 +404,8 @@ class _Comparison(Expression):
 
 
 class Equal(_Comparison):
+    """Indicator expression: 1.0 where ``left == right``, 0.0 elsewhere."""
+
     def evaluate(self, data=None, draws=None):
         return (self.left.evaluate(data, draws) == self.right.evaluate(data, draws)).astype(float)
 
@@ -351,6 +414,8 @@ class Equal(_Comparison):
 
 
 class NotEqual(_Comparison):
+    """Indicator expression: 1.0 where ``left != right``, 0.0 elsewhere."""
+
     def evaluate(self, data=None, draws=None):
         return (self.left.evaluate(data, draws) != self.right.evaluate(data, draws)).astype(float)
 
@@ -359,6 +424,8 @@ class NotEqual(_Comparison):
 
 
 class LessThan(_Comparison):
+    """Indicator expression: 1.0 where ``left < right``, 0.0 elsewhere."""
+
     def evaluate(self, data=None, draws=None):
         return (self.left.evaluate(data, draws) < self.right.evaluate(data, draws)).astype(float)
 
@@ -367,6 +434,8 @@ class LessThan(_Comparison):
 
 
 class LessEqual(_Comparison):
+    """Indicator expression: 1.0 where ``left <= right``, 0.0 elsewhere."""
+
     def evaluate(self, data=None, draws=None):
         return (self.left.evaluate(data, draws) <= self.right.evaluate(data, draws)).astype(float)
 
@@ -375,6 +444,8 @@ class LessEqual(_Comparison):
 
 
 class GreaterThan(_Comparison):
+    """Indicator expression: 1.0 where ``left > right``, 0.0 elsewhere."""
+
     def evaluate(self, data=None, draws=None):
         return (self.left.evaluate(data, draws) > self.right.evaluate(data, draws)).astype(float)
 
@@ -383,6 +454,8 @@ class GreaterThan(_Comparison):
 
 
 class GreaterEqual(_Comparison):
+    """Indicator expression: 1.0 where ``left >= right``, 0.0 elsewhere."""
+
     def evaluate(self, data=None, draws=None):
         return (self.left.evaluate(data, draws) >= self.right.evaluate(data, draws)).astype(float)
 
@@ -395,7 +468,13 @@ class GreaterEqual(_Comparison):
 # ---------------------------------------------------------------------------
 
 class Exp(Expression):
-    """Element-wise exponential."""
+    """Element-wise natural exponential of an expression.
+
+    Parameters
+    ----------
+    expr : Expression
+        The argument expression.
+    """
 
     def __init__(self, expr: Expression):
         self.expr = expr
@@ -415,7 +494,13 @@ class Exp(Expression):
 
 
 class Log(Expression):
-    """Element-wise natural logarithm."""
+    """Element-wise natural logarithm of an expression.
+
+    Parameters
+    ----------
+    expr : Expression
+        The argument expression. Must be positive when evaluated.
+    """
 
     def __init__(self, expr: Expression):
         self.expr = expr
@@ -441,10 +526,14 @@ class Log(Expression):
 class MonteCarlo(Expression):
     """Averages an expression over Monte Carlo draws.
 
-    When ``draws`` is provided and the inner expression returns a
-    2-D array of shape ``(draws, ncs)``, this wrapper collapses the
-    draw dimension by taking the mean. For non-random expressions
-    (draws dimension absent) it is a no-op.
+    When the inner expression returns a 2-D array of shape
+    ``(draws, ncs)``, this wrapper collapses the draw dimension by taking
+    the row-wise mean.  For deterministic expressions it is a no-op.
+
+    Parameters
+    ----------
+    expr : Expression
+        The expression to average over draws.
     """
 
     def __init__(self, expr: Expression):
@@ -471,12 +560,32 @@ class MonteCarlo(Expression):
 # ---------------------------------------------------------------------------
 
 def exp(expr) -> Exp:
-    """Natural exponential of an expression."""
+    """Natural exponential of an expression.
+
+    Parameters
+    ----------
+    expr : Expression or float
+        The argument.
+
+    Returns
+    -------
+    Exp
+    """
     return Exp(_wrap(expr))
 
 
 def log(expr) -> Log:
-    """Natural logarithm of an expression."""
+    """Natural logarithm of an expression.
+
+    Parameters
+    ----------
+    expr : Expression or float
+        The argument. Must be positive when evaluated.
+
+    Returns
+    -------
+    Log
+    """
     return Log(_wrap(expr))
 
 

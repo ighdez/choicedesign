@@ -4,26 +4,10 @@
 .. automodule:: choicedesign.design
 
    
-   
-   
-
-   
-   
-   
-
-   
-   
    .. rubric:: Classes
 
    .. autosummary::
    
-      RUMDesign
+      EffDesign
+      FullFactDesign
    
-   
-
-   
-   
-   
-
-
-

@@ -1,4 +1,18 @@
-"""Optimisation algorithms"""
+"""Optimisation algorithms for efficient experimental designs.
+
+Implements three column-wise search heuristics:
+
+- ``_swapalg`` — Random Swapping: picks a random attribute column and swaps
+  two row values.
+- ``_rscalg`` — RSC (Relabelling, Swapping, Cycling): applies one of three
+  random column moves per iteration.
+- ``_federovalg`` — Modified Federov: replaces one row at a time with the
+  best candidate from the full factorial of attribute levels.
+
+All three algorithms share the same stopping-criteria interface
+(``iter_lim``, ``noimprov_lim``, ``time_lim``) and accept a generic criterion
+callable, so they work with D-, A-, or C-error interchangeably.
+"""
 
 # Load modules
 import datetime

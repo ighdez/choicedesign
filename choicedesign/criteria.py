@@ -1,4 +1,14 @@
-"""Optimisation criteria — native MNL implementation"""
+"""Optimality criteria for discrete choice experimental designs.
+
+Provides:
+
+- :class:`MNLModel` — a pre-compiled MNL model used inside the optimisation loop.
+- ``_derr`` — D-error (D-efficient design criterion).
+- ``_db_derr`` — Db-error (Bayesian D-efficient, averaged over prior draws).
+- ``_aerr`` — A-error (average parameter variance).
+- ``_cerr`` — C-error (WTP variance via delta method).
+- ``_utility_balance`` — utility balance ratio.
+"""
 
 import numpy as np
 import pandas as pd
