@@ -1,3 +1,11 @@
+1.0.0
+- A-efficient designs: minimise A-error (trace(I⁻¹)/K) via criterion='a'
+- C-efficient designs: minimise sum of WTP variances (delta method) via criterion='c', cost_param, wtp_params
+- RSC (Relabelling, Swapping, Cycling) and Modified Federov optimisation algorithms
+- Corrected condition system: replaced eval-based _condgen with a callable parser (no more substring collisions or hidden state)
+- Fix: Modified Federov algorithm crashed with read-only NumPy array
+- Fix: progress bar now shows correct criterion label (A-error / C-error) for non-D criteria
+
 0.2.2
 - Expressions rewritten from scratch (no Biogeme dependency)
 - Db-efficient (Bayesian) design via Parameter(prior_std=...) and bayes_draws argument

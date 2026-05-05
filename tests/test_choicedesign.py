@@ -8,7 +8,7 @@ from choicedesign.expressions import Attribute, Parameter
 
 
 def test_version():
-    assert __version__ == '0.2.2'
+    assert __version__ == '1.0.0'
 
 
 # ---------------------------------------------------------------------------
