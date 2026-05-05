@@ -3,7 +3,6 @@
 # Import modules
 import numpy as np
 import pandas as pd
-from scipy.stats import chi2_contingency
 
 # Function for dummy generation
 def _dummygen(x,levs):
@@ -43,6 +42,7 @@ def _blockgen(design: pd.DataFrame, n_blocks: int, reps: int):
 
     bestcorr = np.inf
     bestblock = blocks.copy()
+    corr_list = []
 
     design_array = design.iloc[:,1:]
 
@@ -50,14 +50,15 @@ def _blockgen(design: pd.DataFrame, n_blocks: int, reps: int):
         np.random.shuffle(blocks)
         design_array['cand_block'] = blocks
 
-        sumcorr = design_array.corr()['cand_block'].sum()
+        sumcorr = design_array.corr()['cand_block'].abs().sum()
         
         if sumcorr < bestcorr:
             bestblock = blocks.copy()
             bestcorr = sumcorr
+            corr_list.append(bestcorr)
 
     # return bestblock
-    return bestblock
+    return bestblock, corr_list
 
 # Condition generation function
 def _condgen(desname: str, cond: list, names: list, init: bool = False):

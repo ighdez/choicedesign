@@ -3,16 +3,17 @@
 # Load modules
 import datetime
 import time
+from typing import Callable
 import pandas as pd
 import numpy as np
-from biogeme.expressions import Expression
-from choicedesign.criteria import _derr
+from choicedesign.criteria import MNLModel
 
 # Swapping algorithm function
 def _swapalg(
-    design: pd.DataFrame, model: Expression,draws: int,
+    design: pd.DataFrame, model: MNLModel,
     init_perf: float, cond: list,
-    iter_lim: float, noimprov_lim: float,time_lim: float):
+    iter_lim: float, noimprov_lim: float, time_lim: float,
+    derr_fn: Callable):
     """Random swapping algorithm
 
     It optimises an experimental design using a variation of the random swapping 
@@ -80,7 +81,7 @@ def _swapalg(
             
             # If all conditions are satisfied, compute D-error
             if check_all:
-                newperf = _derr(pd.DataFrame(swapdes,columns=names),model,draws)
+                newperf = derr_fn(pd.DataFrame(swapdes,columns=names),model)
 
         # ...else if they do not differ, keep the D-error
         else:

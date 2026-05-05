@@ -1,3 +1,13 @@
+0.2.2
+- Expressions rewritten from scratch (no Biogeme dependency)
+- Db-efficient (Bayesian) design via Parameter(prior_std=...) and bayes_draws argument
+- FullFactDesign reimplemented using itertools.product (drops broken pyDOE2 dependency)
+- Expanded test suite (expressions, D-error, swapping, blocking, conditions)
+- CI/CD pipeline via GitHub Actions
+
+0.2.1
+- Bayesian designs reverted till proper implementation
+
 0.1.6
 - Added support for fixed columns
 

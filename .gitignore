@@ -1,4 +1,6 @@
 dist/
+CLAUDE.md
+.memory/
 choicedesign/__pycache__/__init__.cpython-39.pyc
 choicedesign/__pycache__/algorithms.cpython-39.pyc
 choicedesign/__pycache__/criteria.cpython-39.pyc

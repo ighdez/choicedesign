@@ -1,17 +1,15 @@
 """Modules to construct experimental designs"""
 
 # Import modules
+import itertools
 import pandas as pd
 import numpy as np
 import datetime
 from typing import List
-from biogeme.expressions import MonteCarlo, log
-from biogeme.models import loglogit, logit
-# from pyDOE2 import fullfact
 
 from choicedesign.expressions import Attribute
 from choicedesign.algorithms import _swapalg
-from choicedesign.criteria import _derr, _utility_balance
+from choicedesign.criteria import MNLModel, _derr, _db_derr, _utility_balance
 from choicedesign.utils import _blockgen, _condgen, _initdesign
 
 # Efficient design
@@ -84,7 +82,7 @@ class EffDesign:
         return pd.DataFrame(init_design,columns=self.names)
 
     # Optimise
-    def optimise(self, init_design: pd.DataFrame, V: dict, model: str = 'mnl', draws: int = 1000, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
+    def optimise(self, init_design: pd.DataFrame, V: dict, model: str = 'mnl', bayes_draws: int = None, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
         """Create D-efficient RUM design
 
         Starts the optimisation of the design using a random swapping 
@@ -97,14 +95,16 @@ class EffDesign:
         initial_design : pandas.DataFrame
             The initial design matrix as a Pandas DataFrame
         V : dict
-            A dictionary with the utility function, using the same syntax as in Biogeme
+            A dictionary with the utility functions, keyed by alternative index.
+            e.g. ``{1: V1, 2: V2}``
         model : str
             The base model for the efficient design, by default 'mnl'
-        draws : int, optional
-            Number of draws for the Monte Carlo integration, by default 1000
-        n_blocks : int, optional
-            Number of blocks of the final design. Must be a multiple of the number of 
-            choice situations, by default None
+        bayes_draws : int, optional
+            Number of Monte Carlo draws for Db-efficient (Bayesian) design.
+            When set, the optimizer minimises the expected D-error averaged
+            over draws from the prior distributions of parameters that have
+            ``prior_std`` defined. When ``None`` (default), standard point
+            D-error is used.
         iter_lim : int, optional
             Number of iterations before the algorithm stops, by default None
         noimprov_lim : int, optional
@@ -153,26 +153,18 @@ class EffDesign:
 
         desmat = init_design
 
-        models_ubalance = []
-        av = dict()
         if model == 'mnl':
-            for k, _ in V.items():
-                av[k] = 1
-            model_object = loglogit(V,av,1)
-
-            for k, _ in V.items():
-                models_ubalance.append(logit(V,av,k))
-        elif model == 'mnl_bayesian':
-            for k, _ in V.items():
-                av[k] = 1
-            model_object = log(MonteCarlo(logit(V,av,1)))
-
-            for k, _ in V.items():
-                models_ubalance.append(MonteCarlo(logit(V,av,k)))
+            model_object = MNLModel(V)
         else:
-            raise ValueError("""Model name must be either 'mnl' or 'mnl_bayesian'""")
+            raise ValueError("Model name must be 'mnl'")
 
-        init_perf = _derr(desmat,model_object,draws)
+        if bayes_draws is not None:
+            rng = np.random.default_rng(seed)
+            derr_fn = lambda design, model: _db_derr(design, model, bayes_draws, rng)
+        else:
+            derr_fn = _derr
+
+        init_perf = derr_fn(desmat, model_object)
 
         ############################################################
         ############## Step 2: Initialize algorighm ################
@@ -180,10 +172,10 @@ class EffDesign:
 
         # Execute Swapping algorithm
         optimal_design, final_perf, final_iter, elapsed_time = _swapalg(
-            desmat,model_object,draws,init_perf,self.algconds,iter_lim,noimprov_lim,time_lim)
+            desmat, model_object, init_perf, self.algconds, iter_lim, noimprov_lim, time_lim, derr_fn)
 
         # Compute utility balance ratio
-        ubalance_ratio = _utility_balance(pd.DataFrame(optimal_design,columns=self.names),models_ubalance,draws)
+        ubalance_ratio = _utility_balance(pd.DataFrame(optimal_design, columns=self.names), model_object)
 
         ############################################################
         ############## Step 3: Arange final design #################
@@ -238,13 +230,13 @@ class EffDesign:
         design : pd.DataFrame
             Optimal design with the block column
         """
-        blocksrow = _blockgen(design,n_blocks,n_iter)
+        blocksrow, corr_list = _blockgen(design,n_blocks,n_iter)
         design['Block'] = blocksrow
 
-        return design
+        return design, corr_list
 
     # Evaluate
-    def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl', draws: int = 1000):
+    def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl', bayes_draws: int = None, seed: int = None):
         """Evaluate design
 
         Evaluates a design stored in a Pandas data frame
@@ -254,14 +246,21 @@ class EffDesign:
         design : pd.DataFrame
             Design to evaluate
         V : dict
-            A dictionary with the utility function, using the same syntax as in Biogeme
+            A dictionary with the utility function.
         model : str
             The base model for the efficient design, by default 'mnl'
+        bayes_draws : int, optional
+            Number of Monte Carlo draws for Db-error evaluation. When set,
+            returns the expected D-error over prior distributions of
+            parameters that have ``prior_std`` defined. When ``None``
+            (default), returns the standard point D-error.
+        seed : int, optional
+            Random seed for Bayesian draws, by default None
 
         Returns
         -------
         perf : float
-            The D-error of the design
+            The D-error (or Db-error) of the design
         ubalance_ratio : float
             Utility balance ratio
         """
@@ -271,55 +270,47 @@ class EffDesign:
         if 'Block' in desmat.columns:
             desmat = desmat.drop('Block',axis=1)
 
-        models_ubalance = []
-        av = dict()
         if model == 'mnl':
-            for k, _ in V.items():
-                av[k] = 1
-            model_object = loglogit(V,av,1)
-
-            for k, _ in V.items():
-                models_ubalance.append(logit(V,av,k))
-        elif model == 'mnl_bayesian':
-            for k, _ in V.items():
-                av[k] = 1
-            model_object = log(MonteCarlo(logit(V,av,1)))
-
-            for k, _ in V.items():
-                models_ubalance.append(MonteCarlo(logit(V,av,k)))
+            model_object = MNLModel(V)
         else:
-            raise ValueError("""Model name must be either 'mnl' or 'mnl_bayesian'""")
-        
+            raise ValueError("Model name must be 'mnl'")
+
         # Evaluate the performance and utility balance of the design
-        perf = _derr(desmat,model_object,draws)
-        ubalance_ratio = _utility_balance(desmat,models_ubalance,draws)
+        if bayes_draws is not None:
+            rng = np.random.default_rng(seed)
+            perf = _db_derr(desmat, model_object, bayes_draws, rng)
+        else:
+            perf = _derr(desmat, model_object)
+        ubalance_ratio = _utility_balance(desmat, model_object)
 
         # Return performance and utility balance
         return perf, ubalance_ratio
     
-# Class for Full-factorial design
-# class FullFactDesign:
-#     # Init method
-#     def __init__(self, X: dict):
- 
-#         # Set names and levels
-#         self.names = [j.name for j in X]
-#         self.levs = [j.levels for j in X]
+class FullFactDesign:
+    """Class for full-factorial designs
 
-#         self.J = len(X)
-#         self.K = len(self.levs)
+    Generates a full-factorial design matrix covering all combinations of
+    attribute levels.
 
-#     # Generate design matrix
-#     def gen_design(self):
-#         # Generate default full-fact design
-#         n_levels = [len(j) for j in self.levs]
-#         init_design = fullfact(n_levels)
+    Parameters
+    ----------
+    X : List[Attribute]
+        List of `Attribute` elements.
+    """
 
-#         # Create pandas dataframe
-#         init_design = pd.DataFrame(init_design.astype(int),columns=self.names)
+    def __init__(self, X: list):
+        self.names = [j.name for j in X]
+        self.levs = [j.levels for j in X]
 
-#         # Replace values with the actual attribute levels
-#         for k in range(self.K):
-#             init_design.iloc[:,k].replace(np.arange(n_levels[k]),self.levs[k],inplace=True)
+    def gen_design(self):
+        """Generate full-factorial design matrix
+
+        Returns
+        -------
+        design : pandas.DataFrame
+            A Pandas DataFrame with all combinations of attribute levels.
+        """
+        rows = list(itertools.product(*self.levs))
+        return pd.DataFrame(rows, columns=self.names)
 
 #         return init_design
