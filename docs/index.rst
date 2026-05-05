@@ -6,9 +6,22 @@
 Welcome to ChoiceDesign's documentation!
 ========================================
 
+ChoiceDesign is a Python package for generating **D-efficient designs** for
+**Discrete Choice Experiments (DCE)**.  It provides a clean API for defining
+utility functions symbolically, optimising designs under constraints, and
+evaluating design quality with multiple optimality criteria.
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: User guide
+
+   getting_started
+   concepts
+   examples
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API reference
 
 .. autosummary::
    :toctree: generated
