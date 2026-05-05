@@ -14,7 +14,7 @@ def _swapalg(
     design: pd.DataFrame, model: MNLModel,
     init_perf: float, cond: list,
     iter_lim: float, noimprov_lim: float, time_lim: float,
-    derr_fn: Callable):
+    derr_fn: Callable, criterion_label: str = 'D-error'):
     """Random swapping algorithm
 
     It optimises an experimental design using a variation of the random swapping 
@@ -93,7 +93,7 @@ def _swapalg(
             ni = 0
             
             # Update progress bar
-            print('Optimizing / ' + 'Elapsed: ' + str(datetime.timedelta(seconds=difftime))[:7] + ' / D-error: ' + str(round(iterperf,6)),end='\r')
+            print('Optimizing / ' + 'Elapsed: ' + str(datetime.timedelta(seconds=difftime))[:7] + ' / ' + criterion_label + ': ' + str(round(iterperf,6)),end='\r')
         
         # ...else, pass to a random attribute and increment the 'no improvement' counter by 1.
         else:
@@ -102,7 +102,7 @@ def _swapalg(
         
         # Update progress bar each second
         if (difftime)%1 < 0.1:
-            print('Optimizing / ' + 'Elapsed: ' + str(datetime.timedelta(seconds=difftime))[:7] + ' / D-error: ' + str(round(iterperf,6)),end='\r',flush=True)
+            print('Optimizing / ' + 'Elapsed: ' + str(datetime.timedelta(seconds=difftime))[:7] + ' / ' + criterion_label + ': ' + str(round(iterperf,6)),end='\r',flush=True)
         
         t1 = time.time()
         difftime = t1-t0
@@ -116,7 +116,7 @@ def _rscalg(
     design: pd.DataFrame, model: MNLModel,
     init_perf: float, cond: list,
     iter_lim: float, noimprov_lim: float, time_lim: float,
-    derr_fn: Callable):
+    derr_fn: Callable, criterion_label: str = 'D-error'):
     """Random RSC (Relabelling, Swapping, Cycling) algorithm
 
     Optimises an experimental design by applying one of three random moves
@@ -199,12 +199,12 @@ def _rscalg(
             desmat = swapdes.copy()
             iterperf = newperf.copy()
             ni = 0
-            print('Optimizing / ' + 'Elapsed: ' + str(datetime.timedelta(seconds=difftime))[:7] + ' / D-error: ' + str(round(iterperf, 6)), end='\r')
+            print('Optimizing / ' + 'Elapsed: ' + str(datetime.timedelta(seconds=difftime))[:7] + ' / ' + criterion_label + ': ' + str(round(iterperf, 6)), end='\r')
         else:
             ni += 1
 
         if difftime % 1 < 0.1:
-            print('Optimizing / ' + 'Elapsed: ' + str(datetime.timedelta(seconds=difftime))[:7] + ' / D-error: ' + str(round(iterperf, 6)), end='\r', flush=True)
+            print('Optimizing / ' + 'Elapsed: ' + str(datetime.timedelta(seconds=difftime))[:7] + ' / ' + criterion_label + ': ' + str(round(iterperf, 6)), end='\r', flush=True)
 
         t1 = time.time()
         difftime = t1 - t0
@@ -217,7 +217,7 @@ def _federovalg(
     design: pd.DataFrame, model: MNLModel,
     init_perf: float, cond: list,
     iter_lim: float, noimprov_lim: float, time_lim: float,
-    derr_fn: Callable, levs: list):
+    derr_fn: Callable, levs: list, criterion_label: str = 'D-error'):
     """Modified Federov algorithm
 
     Optimises an experimental design by replacing one row at a time with the
@@ -235,7 +235,7 @@ def _federovalg(
     of algorithms for generating efficient choice experiments.
     """
     names = design.columns
-    desmat = design.to_numpy()
+    desmat = design.to_numpy().copy()
 
     # Build candidate set from full factorial, then pre-filter by conditions
     candidate_set = np.array(list(itertools.product(*levs)))
@@ -281,12 +281,12 @@ def _federovalg(
             desmat[r] = best_candidate
             iterperf = best_perf
             ni = 0
-            print('Optimizing / ' + 'Elapsed: ' + str(datetime.timedelta(seconds=difftime))[:7] + ' / D-error: ' + str(round(iterperf, 6)), end='\r')
+            print('Optimizing / ' + 'Elapsed: ' + str(datetime.timedelta(seconds=difftime))[:7] + ' / ' + criterion_label + ': ' + str(round(iterperf, 6)), end='\r')
         else:
             ni += 1
 
         if difftime % 1 < 0.1:
-            print('Optimizing / ' + 'Elapsed: ' + str(datetime.timedelta(seconds=difftime))[:7] + ' / D-error: ' + str(round(iterperf, 6)), end='\r', flush=True)
+            print('Optimizing / ' + 'Elapsed: ' + str(datetime.timedelta(seconds=difftime))[:7] + ' / ' + criterion_label + ': ' + str(round(iterperf, 6)), end='\r', flush=True)
 
         t1 = time.time()
         difftime = t1 - t0

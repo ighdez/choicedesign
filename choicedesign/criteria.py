@@ -241,6 +241,83 @@ def _db_derr(
     return total / n_draws
 
 
+def _aerr(design: pd.DataFrame, model: MNLModel) -> float:
+    """A-error of a design: average variance across all K non-ASC parameters.
+
+    .. math::
+
+        A\\text{-error} = \\operatorname{trace}\\left(I^{-1}\\right) / K
+
+    Returns ``np.inf`` when the information matrix is singular.
+    """
+    im = model.information_matrix(design)
+
+    non_asc_idx = [i for i, p in enumerate(model.params) if not isinstance(p, ASC)]
+    if len(non_asc_idx) < im.shape[0]:
+        ix = np.ix_(non_asc_idx, non_asc_idx)
+        im = im[ix]
+
+    if np.isclose(np.linalg.det(im), 0):
+        return np.inf
+
+    vce = np.linalg.solve(im, np.eye(im.shape[0]))
+    return np.trace(vce) / im.shape[0]
+
+
+def _cerr(
+    design: pd.DataFrame,
+    model: MNLModel,
+    cost_param: Parameter,
+    wtp_params: List[Parameter],
+) -> float:
+    """C-error of a design: sum of WTP variances (delta method).
+
+    For each ``wtp_param`` β_x the WTP = β_x / β_cost has variance
+
+    .. math::
+
+        c_i^\\top I^{-1} c_i, \\quad
+        c_i[x] = 1/\\beta_{\\text{cost}},\\;
+        c_i[\\text{cost}] = -\\beta_x / \\beta_{\\text{cost}}^2
+
+    The C-error is the sum over all nominated WTPs.  Returns ``np.inf``
+    when the information matrix is singular.
+
+    Parameters
+    ----------
+    cost_param : Parameter
+        The cost (denominator) parameter.
+    wtp_params : list[Parameter]
+        Parameters whose WTP ratios are to be optimised.
+    """
+    im = model.information_matrix(design)
+
+    non_asc_params = [p for p in model.params if not isinstance(p, ASC)]
+    non_asc_idx = [i for i, p in enumerate(model.params) if not isinstance(p, ASC)]
+    if len(non_asc_idx) < im.shape[0]:
+        ix = np.ix_(non_asc_idx, non_asc_idx)
+        im = im[ix]
+
+    if np.isclose(np.linalg.det(im), 0):
+        return np.inf
+
+    vce = np.linalg.solve(im, np.eye(im.shape[0]))
+
+    param_names = [p.name for p in non_asc_params]
+    cost_idx = param_names.index(cost_param.name)
+    K = len(non_asc_params)
+
+    total = 0.0
+    for wtp_p in wtp_params:
+        wtp_idx = param_names.index(wtp_p.name)
+        c = np.zeros(K)
+        c[wtp_idx] = 1.0 / cost_param.prior
+        c[cost_idx] = -wtp_p.prior / (cost_param.prior ** 2)
+        total += c @ vce @ c
+
+    return total
+
+
 def _utility_balance(design: pd.DataFrame, model: MNLModel) -> float:
     """Utility balance ratio of a design.
 
