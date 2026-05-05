@@ -1,6 +1,7 @@
 # ChoiceDesign
 
 ![Tests](https://github.com/ighdez/choicedesign/actions/workflows/tests.yml/badge.svg)
+[![Documentation](https://readthedocs.org/projects/choicedesign/badge/?version=latest)](https://choicedesign.readthedocs.io)
 
 **ChoiceDesign** is a Python package tool to construct efficient designs for Discrete Choice Experiments. ChoiceDesign combines enough flexibility to construct from simple 2-alternative designs with few attributes, to more complex settings that may involve conditions between attributes. ChoiceDesign is a revamped version of [EDT](https://github.com/ighdez/EDT), a project I created some years ago for the same purpose. ChoiceDesign includes improvements over EDT such as class-based syntax, coding improvements, better documentation and making this package available to install via `pip`.
 
@@ -23,9 +24,13 @@ The main features of ChoiceDesign are:
 * Full-factorial designs
 * Multiple stopping criteria (fixed number of iterations, iterations without improvement, or fixed time)
 
+## Documentation
+
+Full documentation, including a getting started guide, concepts, and example notebooks, is available at **[choicedesign.readthedocs.io](https://choicedesign.readthedocs.io)**.
+
 ## Examples
 
-I provide some Jupyter notebooks that illustrate the use of ChoiceDesign in the `examples/` folder of this repo.
+Jupyter notebooks illustrating different design scenarios are available in the `examples/` folder of this repo and rendered in the [documentation](https://choicedesign.readthedocs.io/en/latest/examples.html).
 
 ## How to contribute?
 Any contributions to ChoiceDesign are welcome via this Git, or to my email joseignaciohernandezh at gmail dot com.
