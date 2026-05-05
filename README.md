@@ -2,7 +2,7 @@
 
 ![Tests](https://github.com/ighdez/choicedesign/actions/workflows/tests.yml/badge.svg)
 
-**ChoiceDesign** is a Python package tool to construct D-efficient designs for Discrete Choice Experiments. ChoiceDesign combines enough flexibility to construct from simple 2-alternative designs with few attributes, to more complex settings that may involve conditions between attributes. ChoiceDesign is a revamped version of [EDT](https://github.com/ighdez/EDT), a project I created some years ago for the same purpose. ChoiceDesign includes improvements over EDT such as class-based syntax, coding improvements, better documentation and making this package available to install via `pip`.
+**ChoiceDesign** is a Python package tool to construct efficient designs for Discrete Choice Experiments. ChoiceDesign combines enough flexibility to construct from simple 2-alternative designs with few attributes, to more complex settings that may involve conditions between attributes. ChoiceDesign is a revamped version of [EDT](https://github.com/ighdez/EDT), a project I created some years ago for the same purpose. ChoiceDesign includes improvements over EDT such as class-based syntax, coding improvements, better documentation and making this package available to install via `pip`.
 
 ## Installation
 
@@ -14,8 +14,10 @@ ChoiceDesign is available to install via the regular syntax of `pip`:
 
 The main features of ChoiceDesign are:
 
-* D-efficient and Db-efficient (Bayesian) designs based on a random swapping algorithm
-* **Customisable utility functions** (inspired by [Biogeme](https://biogeme.epfl.ch/). In previous versions, I relied on Biogeme functions. Now they're rewritten from scratch)
+* **D-efficient, A-efficient, and C-efficient designs** — minimise D-error (determinant), A-error (average variance), or C-error (WTP variance sum)
+* **Db-efficient (Bayesian) designs** via `Parameter(prior_std=...)` and `bayes_draws` argument
+* **Three optimisation algorithms** — random swapping, RSC (Relabelling, Swapping, Cycling), and Modified Federov
+* **Customisable utility functions** (no external dependencies — expressions rewritten from scratch)
 * Designs with conditions over different attribute levels
 * Designs with blocks
 * Full-factorial designs

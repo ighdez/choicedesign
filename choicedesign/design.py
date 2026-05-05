@@ -8,9 +8,9 @@ import datetime
 from typing import List
 
 from choicedesign.expressions import Attribute
-from choicedesign.algorithms import _swapalg
-from choicedesign.criteria import MNLModel, _derr, _db_derr, _utility_balance
-from choicedesign.utils import _blockgen, _condgen, _initdesign
+from choicedesign.algorithms import _swapalg, _rscalg, _federovalg
+from choicedesign.criteria import MNLModel, _derr, _db_derr, _aerr, _cerr, _utility_balance
+from choicedesign.utils import _blockgen, _parse_condition, _initdesign
 
 # Efficient design
 class EffDesign:
@@ -64,25 +64,23 @@ class EffDesign:
             A Pandas DataFrame with the initial design matrix.
         """
 
-        # Generate conditions if defined
+        # Parse conditions into callables (validates attribute names immediately)
         if cond is not None:
-            self.initconds = _condgen('desmat',cond,self.names,init=True)
-            self.algconds = _condgen('swapdes',cond,self.names,init=False)
+            self.cond_callables = [_parse_condition(c, self.names) for c in cond]
         else:
-            self.initconds = None
-            self.algconds = None
+            self.cond_callables = None
 
         # Set random seed if defined
         if seed is not None:
             np.random.seed(seed)
 
         # Generate initial design matrix
-        init_design = _initdesign(levs=self.levs,ncs=self.N,cond=self.initconds)
+        init_design = _initdesign(levs=self.levs, ncs=self.N, cond=self.cond_callables)
 
         return pd.DataFrame(init_design,columns=self.names)
 
     # Optimise
-    def optimise(self, init_design: pd.DataFrame, V: dict, model: str = 'mnl', bayes_draws: int = None, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
+    def optimise(self, init_design: pd.DataFrame, V: dict, model: str = 'mnl', algorithm: str = 'swap', criterion: str = 'd', cost_param=None, wtp_params=None, bayes_draws: int = None, iter_lim: int = None, noimprov_lim: int = None, time_lim: int = None, seed: int = None, verbose: bool = False):
         """Create D-efficient RUM design
 
         Starts the optimisation of the design using a random swapping 
@@ -99,12 +97,26 @@ class EffDesign:
             e.g. ``{1: V1, 2: V2}``
         model : str
             The base model for the efficient design, by default 'mnl'
+        algorithm : str
+            Optimisation algorithm to use. Options: ``'swap'`` (random swapping,
+            default), ``'rsc'`` (random Relabelling, Swapping, Cycling), or
+            ``'federov'`` (Modified Federov — tries all full-factorial candidates
+            per row per iteration; slower per iteration but more systematic).
+        criterion : str
+            Optimality criterion: ``'d'`` (D-error, default), ``'a'`` (A-error),
+            or ``'c'`` (C-error / WTP variance). When ``'c'``, ``cost_param``
+            and ``wtp_params`` are required.
+        cost_param : Parameter, optional
+            The cost (denominator) parameter used to compute WTP ratios.
+            Required when ``criterion='c'``.
+        wtp_params : list[Parameter], optional
+            Parameters whose WTP ratios are minimised. Required when
+            ``criterion='c'``.
         bayes_draws : int, optional
             Number of Monte Carlo draws for Db-efficient (Bayesian) design.
-            When set, the optimizer minimises the expected D-error averaged
-            over draws from the prior distributions of parameters that have
-            ``prior_std`` defined. When ``None`` (default), standard point
-            D-error is used.
+            Only valid with ``criterion='d'``. When set, the optimizer minimises
+            the expected D-error averaged over draws from the prior distributions
+            of parameters that have ``prior_std`` defined.
         iter_lim : int, optional
             Number of iterations before the algorithm stops, by default None
         noimprov_lim : int, optional
@@ -122,9 +134,9 @@ class EffDesign:
         optimal_design : pandas.DataFrame
             The final (optimal) design
         init_perf : float
-            D-error of the initial design
+            Criterion value of the initial design
         final_perf : float
-            D-error of the final design 
+            Criterion value of the final design
         final_iter : int
             Total number of iterations
         ubalance_ratio : float
@@ -158,11 +170,26 @@ class EffDesign:
         else:
             raise ValueError("Model name must be 'mnl'")
 
-        if bayes_draws is not None:
-            rng = np.random.default_rng(seed)
-            derr_fn = lambda design, model: _db_derr(design, model, bayes_draws, rng)
+        if criterion == 'd':
+            if bayes_draws is not None:
+                rng = np.random.default_rng(seed)
+                derr_fn = lambda design, model: _db_derr(design, model, bayes_draws, rng)
+            else:
+                derr_fn = _derr
+        elif criterion == 'a':
+            if bayes_draws is not None:
+                raise ValueError("bayes_draws is only supported with criterion='d'")
+            derr_fn = _aerr
+        elif criterion == 'c':
+            if cost_param is None or wtp_params is None:
+                raise ValueError("criterion='c' requires both 'cost_param' and 'wtp_params'")
+            if bayes_draws is not None:
+                raise ValueError("bayes_draws is only supported with criterion='d'")
+            derr_fn = lambda design, model: _cerr(design, model, cost_param, wtp_params)
         else:
-            derr_fn = _derr
+            raise ValueError("criterion must be 'd', 'a', or 'c'")
+
+        criterion_label = {'d': 'D-error', 'a': 'A-error', 'c': 'C-error'}[criterion]
 
         init_perf = derr_fn(desmat, model_object)
 
@@ -170,9 +197,18 @@ class EffDesign:
         ############## Step 2: Initialize algorighm ################
         ############################################################
 
-        # Execute Swapping algorithm
-        optimal_design, final_perf, final_iter, elapsed_time = _swapalg(
-            desmat, model_object, init_perf, self.algconds, iter_lim, noimprov_lim, time_lim, derr_fn)
+        # Execute optimisation algorithm
+        if algorithm == 'swap':
+            optimal_design, final_perf, final_iter, elapsed_time = _swapalg(
+                desmat, model_object, init_perf, self.cond_callables, iter_lim, noimprov_lim, time_lim, derr_fn, criterion_label)
+        elif algorithm == 'rsc':
+            optimal_design, final_perf, final_iter, elapsed_time = _rscalg(
+                desmat, model_object, init_perf, self.cond_callables, iter_lim, noimprov_lim, time_lim, derr_fn, criterion_label)
+        elif algorithm == 'federov':
+            optimal_design, final_perf, final_iter, elapsed_time = _federovalg(
+                desmat, model_object, init_perf, self.cond_callables, iter_lim, noimprov_lim, time_lim, derr_fn, self.levs, criterion_label)
+        else:
+            raise ValueError("algorithm must be 'swap', 'rsc', or 'federov'")
 
         # Compute utility balance ratio
         ubalance_ratio = _utility_balance(pd.DataFrame(optimal_design, columns=self.names), model_object)
@@ -201,8 +237,8 @@ class EffDesign:
         if verbose:
             print('Optimization complete')
             print('Elapsed time: ' + str(datetime.timedelta(seconds=elapsed_time))[:7])
-            print('D-error of initial design: ',round(init_perf,6))
-            print('D-error of last stored design: ',round(final_perf,6))
+            print(f'{criterion_label} of initial design: ',round(init_perf,6))
+            print(f'{criterion_label} of last stored design: ',round(final_perf,6))
             print('Utility Balance ratio: ',round(ubalance_ratio,2),'%')
             print('Algorithm iterations: ',final_iter)
             print('')
@@ -236,7 +272,7 @@ class EffDesign:
         return design, corr_list
 
     # Evaluate
-    def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl', bayes_draws: int = None, seed: int = None):
+    def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl', criterion: str = 'd', cost_param=None, wtp_params=None, bayes_draws: int = None, seed: int = None):
         """Evaluate design
 
         Evaluates a design stored in a Pandas data frame
@@ -249,18 +285,25 @@ class EffDesign:
             A dictionary with the utility function.
         model : str
             The base model for the efficient design, by default 'mnl'
+        criterion : str
+            Optimality criterion: ``'d'`` (D-error, default), ``'a'`` (A-error),
+            or ``'c'`` (C-error / WTP variance). When ``'c'``, ``cost_param``
+            and ``wtp_params`` are required.
+        cost_param : Parameter, optional
+            The cost (denominator) parameter. Required when ``criterion='c'``.
+        wtp_params : list[Parameter], optional
+            Parameters whose WTP variances are evaluated. Required when
+            ``criterion='c'``.
         bayes_draws : int, optional
-            Number of Monte Carlo draws for Db-error evaluation. When set,
-            returns the expected D-error over prior distributions of
-            parameters that have ``prior_std`` defined. When ``None``
-            (default), returns the standard point D-error.
+            Number of Monte Carlo draws for Db-error evaluation. Only valid
+            with ``criterion='d'``.
         seed : int, optional
             Random seed for Bayesian draws, by default None
 
         Returns
         -------
         perf : float
-            The D-error (or Db-error) of the design
+            The criterion value of the design
         ubalance_ratio : float
             Utility balance ratio
         """
@@ -276,11 +319,24 @@ class EffDesign:
             raise ValueError("Model name must be 'mnl'")
 
         # Evaluate the performance and utility balance of the design
-        if bayes_draws is not None:
-            rng = np.random.default_rng(seed)
-            perf = _db_derr(desmat, model_object, bayes_draws, rng)
+        if criterion == 'd':
+            if bayes_draws is not None:
+                rng = np.random.default_rng(seed)
+                perf = _db_derr(desmat, model_object, bayes_draws, rng)
+            else:
+                perf = _derr(desmat, model_object)
+        elif criterion == 'a':
+            if bayes_draws is not None:
+                raise ValueError("bayes_draws is only supported with criterion='d'")
+            perf = _aerr(desmat, model_object)
+        elif criterion == 'c':
+            if cost_param is None or wtp_params is None:
+                raise ValueError("criterion='c' requires both 'cost_param' and 'wtp_params'")
+            if bayes_draws is not None:
+                raise ValueError("bayes_draws is only supported with criterion='d'")
+            perf = _cerr(desmat, model_object, cost_param, wtp_params)
         else:
-            perf = _derr(desmat, model_object)
+            raise ValueError("criterion must be 'd', 'a', or 'c'")
         ubalance_ratio = _utility_balance(desmat, model_object)
 
         # Return performance and utility balance
