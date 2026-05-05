@@ -30,6 +30,10 @@ I provide some Jupyter notebooks that illustrate the use of ChoiceDesign in the 
 ## How to contribute?
 Any contributions to ChoiceDesign are welcome via this Git, or to my email joseignaciohernandezh at gmail dot com.
 
+## Acknowledgements
+
+Parts of this project were developed with the assistance of [Claude](https://claude.ai) by Anthropic.
+
 ## Disclaimer
 
 This software is provided for free and as it is, say with **no warranty**, and neither me nor my current institution is liable of any consequence of the use of it. In any case, integrity checks have been performed by comparing results with alternative software.
