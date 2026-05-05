@@ -1,5 +1,7 @@
 # ChoiceDesign
 
+![Tests](https://github.com/ighdez/choicedesign/actions/workflows/tests.yml/badge.svg)
+
 **ChoiceDesign** is a Python package tool to construct D-efficient designs for Discrete Choice Experiments. ChoiceDesign combines enough flexibility to construct from simple 2-alternative designs with few attributes, to more complex settings that may involve conditions between attributes. ChoiceDesign is a revamped version of [EDT](https://github.com/ighdez/EDT), a project I created some years ago for the same purpose. ChoiceDesign includes improvements over EDT such as class-based syntax, coding improvements, better documentation and making this package available to install via `pip`.
 
 ## Installation
