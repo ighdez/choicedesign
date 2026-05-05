@@ -14,12 +14,12 @@ ChoiceDesign is available to install via the regular syntax of `pip`:
 
 The main features of ChoiceDesign are:
 
-* D-efficient designs based on a random swapping algorithm
+* D-efficient and Db-efficient (Bayesian) designs based on a random swapping algorithm
 * **Customisable utility functions** (inspired by [Biogeme](https://biogeme.epfl.ch/). In previous versions, I relied on Biogeme functions. Now they're rewritten from scratch)
-<!-- * Bayesian priors *(experimental)* -->
 * Designs with conditions over different attribute levels
-* Designs with blocks.
-* Multiple stopping criteria (Fixed number of iterations, iterations without improvement or fixed time).
+* Designs with blocks
+* Full-factorial designs
+* Multiple stopping criteria (fixed number of iterations, iterations without improvement, or fixed time)
 
 ## Examples
 
