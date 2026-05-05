@@ -10,7 +10,7 @@ from typing import List
 from choicedesign.expressions import Attribute
 from choicedesign.algorithms import _swapalg
 from choicedesign.criteria import MNLModel, _derr, _db_derr, _utility_balance
-from choicedesign.utils import _blockgen, _condgen, _initdesign
+from choicedesign.utils import _blockgen, _parse_condition, _initdesign
 
 # Efficient design
 class EffDesign:
@@ -64,20 +64,18 @@ class EffDesign:
             A Pandas DataFrame with the initial design matrix.
         """
 
-        # Generate conditions if defined
+        # Parse conditions into callables (validates attribute names immediately)
         if cond is not None:
-            self.initconds = _condgen('desmat',cond,self.names,init=True)
-            self.algconds = _condgen('swapdes',cond,self.names,init=False)
+            self.cond_callables = [_parse_condition(c, self.names) for c in cond]
         else:
-            self.initconds = None
-            self.algconds = None
+            self.cond_callables = None
 
         # Set random seed if defined
         if seed is not None:
             np.random.seed(seed)
 
         # Generate initial design matrix
-        init_design = _initdesign(levs=self.levs,ncs=self.N,cond=self.initconds)
+        init_design = _initdesign(levs=self.levs, ncs=self.N, cond=self.cond_callables)
 
         return pd.DataFrame(init_design,columns=self.names)
 
@@ -172,7 +170,7 @@ class EffDesign:
 
         # Execute Swapping algorithm
         optimal_design, final_perf, final_iter, elapsed_time = _swapalg(
-            desmat, model_object, init_perf, self.algconds, iter_lim, noimprov_lim, time_lim, derr_fn)
+            desmat, model_object, init_perf, self.cond_callables, iter_lim, noimprov_lim, time_lim, derr_fn)
 
         # Compute utility balance ratio
         ubalance_ratio = _utility_balance(pd.DataFrame(optimal_design, columns=self.names), model_object)

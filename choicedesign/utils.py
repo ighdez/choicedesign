@@ -1,6 +1,7 @@
 """Utilitary functions"""
 
 # Import modules
+import re
 import numpy as np
 import pandas as pd
 
@@ -60,93 +61,145 @@ def _blockgen(design: pd.DataFrame, n_blocks: int, reps: int):
     # return bestblock
     return bestblock, corr_list
 
-# Condition generation function
-def _condgen(desname: str, cond: list, names: list, init: bool = False):
-    """Conditions generator for the design modules"""    
-    # Match variable names with columns in the design matrix
-    if init:
-        design_columns = [desname + '[i,' + str(i) + ']' for i in range(len(names))]
-    else:
-        design_columns = [desname + '[:,' + str(i) + ']' for i in range(len(names))]
+# Condition parsing function
+def _parse_condition(cond_str: str, names: list):
+    """Parse a condition string into a callable.
 
-    # Create new list of conditions
-    conditions = []
+    Supports binary conditions ('A > B'), if/then conditionals
+    ('if A > v then B < w'), and & compounds ('A > v & B < w').
+    Attribute names are resolved to column indices at parse time so
+    any typo raises ValueError immediately, before the design loop runs.
 
-    for c in cond:
-        # Take a copy of the string
-        cc = c[:]
+    Parameters
+    ----------
+    cond_str : str
+        A single condition string.
+    names : list[str]
+        Ordered list of attribute names matching the design matrix columns.
 
-        # Replace names by design matrix columns
-        for i in range(len(names)):
-            cc = cc.replace(names[i],design_columns[i])
-        
-        # If there is a conditional 'if' statement, then convert it to a logical 'or'
-        if 'if' in cc:
-            # Split the sting in the 'then' part
-            if_part, then_part = cc.split('then')
+    Returns
+    -------
+    callable
+        f(desmat: np.ndarray) -> np.ndarray[bool], where desmat has
+        shape (n_rows, n_attributes).
+    """
 
-            # In case there are '&' in the 'if' 'then' part, convert them to '*'
-            if_part = if_part.replace('&','*')
-            then_part = then_part.replace('&','*')
+    _OPS = {
+        '>=': lambda a, b: a >= b,
+        '<=': lambda a, b: a <= b,
+        '==': lambda a, b: a == b,
+        '!=': lambda a, b: a != b,
+        '>':  lambda a, b: a > b,
+        '<':  lambda a, b: a < b,
+    }
 
-            # Set the 'logical_not' operator in the 'if' part
-            if_part = 'np.logical_not(' + if_part.replace('if','') + ')'
+    def _resolve(token):
+        token = token.strip()
+        if token in names:
+            idx = names.index(token)
+            return lambda desmat, i=idx: desmat[:, i]
+        try:
+            val = float(token)
+            return lambda desmat, v=val: np.full(desmat.shape[0], v)
+        except ValueError:
+            raise ValueError(
+                f"'{token}' is not a known attribute or a numeric value. "
+                f"Known attributes: {names}"
+            )
 
-            # Merge if and then parts
-            cc = 'np.logical_or(' + if_part + ',' + then_part + ')'
-        
-        # Finally, append condition to condition list
-        conditions.append(cc)
-    
-    # ...and return the new conditions list
-    return conditions
+    def _parse_atomic(s):
+        s = s.strip()
+        match = re.match(r'^(.+?)\s*(>=|<=|==|!=|>|<)\s*(.+)$', s)
+        if not match:
+            raise ValueError(f"Cannot parse condition fragment: '{s}'")
+        left_token = match.group(1).strip()
+        op          = match.group(2)
+        right_token = match.group(3).strip()
+
+        if left_token not in names:
+            raise ValueError(
+                f"Unknown attribute '{left_token}' in condition '{cond_str}'. "
+                f"Known attributes: {names}"
+            )
+
+        left_fn = _resolve(left_token)
+        right_fn = _resolve(right_token)
+        op_fn = _OPS[op]
+
+        return lambda desmat, l=left_fn, r=right_fn, o=op_fn: o(l(desmat), r(desmat))
+
+    def _parse_and(s):
+        parts = [p.strip() for p in s.split('&')]
+        fns = [_parse_atomic(p) for p in parts if p]
+        if not fns:
+            raise ValueError(f"Empty condition fragment: '{s}'")
+        if len(fns) == 1:
+            return fns[0]
+        def combined(desmat, fns=fns):
+            result = fns[0](desmat)
+            for fn in fns[1:]:
+                result = result & fn(desmat)
+            return result
+        return combined
+
+    cond_str = cond_str.strip()
+
+    # if/then: 'if <antecedent> then <consequent>'
+    # Semantics: NOT(antecedent) OR consequent  (material implication)
+    ifthen = re.match(r'^if\s+(.+?)\s+then\s+(.+)$', cond_str, re.IGNORECASE)
+    if ifthen:
+        if_fn   = _parse_and(ifthen.group(1))
+        then_fn = _parse_and(ifthen.group(2))
+        return lambda desmat, i=if_fn, t=then_fn: (
+            np.logical_or(np.logical_not(i(desmat)), t(desmat))
+        )
+
+    return _parse_and(cond_str)
+
 
 # Generate initial design matrix
 def _initdesign(levs: list, ncs: int, cond: list):
-    """Generate initial design matrix"""
-    # Create and populate the initial design matrix
+    """Generate initial design matrix
+
+    Parameters
+    ----------
+    levs : list
+        List of level arrays, one per attribute.
+    ncs : int
+        Number of choice situations (rows).
+    cond : list[callable] or None
+        Parsed condition callables from `_parse_condition`. Each callable
+        accepts a 2D array of shape (n_rows, n_attrs) and returns a bool array.
+    """
     desmat = []
 
-    # for k in levs:
     for k in range(len(levs)):
         col = np.array((levs[k] * int(np.ceil(ncs/len(levs[k]))))[:ncs])
         np.random.shuffle(col)
         desmat.append(col)
-    
+
     desmat = np.array(desmat).T
 
-    # Apply conditions if needed
     if cond is not None:
         for i in range(ncs):
-            # Check if all conditions are satisfied. If not, do a big enough loop till all conditions are satisfied
-            check_all = []
+            row = desmat[i:i+1, :]
+            satisfied = np.all([np.all(c(row)) for c in cond])
 
-            for c in cond:
-                check_all.append(eval(c))
-
-            check_all = np.all(check_all)
-
-            if not check_all:
+            if not satisfied:
                 for _ in range(10000):
-                    # Create a random vector of levels for the row in question
                     for k in range(len(levs)):
-                        desmat[i,k] = np.random.choice(levs[k])
-                    
-                    # Check if conditions are met with the new vector in the design.
-                    check_all = []
+                        desmat[i, k] = np.random.choice(levs[k])
 
-                    for c in cond:
-                        check_all.append(eval(c))
+                    row = desmat[i:i+1, :]
+                    satisfied = np.all([np.all(c(row)) for c in cond])
 
-                    check_all = np.all(check_all)
-
-
-                    # If so, break the loop and go for the next row
-                    if check_all:
+                    if satisfied:
                         break
-            
-            # If after the big loop conditions are not met, then raise an error
-            assert check_all, 'It is not possible to met all conditions in the initial design matrix.'
-    
-    # Return the design matrix
+
+            if not satisfied:
+                raise ValueError(
+                    f'Could not satisfy all conditions at row {i} after 10000 attempts. '
+                    'The conditions may be too restrictive for the given attribute levels.'
+                )
+
     return desmat

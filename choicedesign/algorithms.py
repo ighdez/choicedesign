@@ -69,15 +69,11 @@ def _swapalg(
             swapdes[pairswap[0],i] = desmat[pairswap[1],i]
             swapdes[pairswap[1],i] = desmat[pairswap[0],i]
         
-            # Check if conditions are satisfied after a swap
-            check_all = [True]
-            
-            # If conditions are defined, this section will check that are satisfied, and rewrite 'check_satisfied_conds' if neccesary
+            # Check if all conditions are satisfied after the swap
             if cond is not None:
-                for c in cond:
-                    check_all.append(np.all(eval(c)))
-
-                check_all = np.all(check_all)
+                check_all = np.all([np.all(c(swapdes)) for c in cond])
+            else:
+                check_all = True
             
             # If all conditions are satisfied, compute D-error
             if check_all:
