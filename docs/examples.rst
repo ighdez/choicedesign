@@ -1,33 +1,21 @@
 Examples
 ========
 
-The ``examples/`` directory contains Jupyter notebooks that demonstrate
-different design scenarios.  Run them with::
+The following notebooks demonstrate different design scenarios.
+Each one can also be run interactively with ``jupyter notebook examples/``.
 
-    jupyter notebook examples/
+.. toctree::
+   :maxdepth: 1
 
-.. list-table::
-   :header-rows: 1
-   :widths: 30 70
-
-   * - Notebook
-     - What it demonstrates
-   * - ``rum_simple``
-     - Basic two-alternative linear utility design with blocking.
-   * - ``rum_dummy``
-     - Categorical attributes encoded with dummy variables.
-   * - ``rum_asc``
-     - Models with alternative-specific constants.
-   * - ``rum_optout``
-     - Three-alternative design including an unlabelled opt-out alternative.
-   * - ``rum_avail``
-     - Alternatives with different attribute subsets (availability conditions).
-   * - ``rum_conds``
-     - Attribute-level constraints using the condition syntax.
-   * - ``rum_bayes``
-     - Bayesian (Db-efficient) design with uncertain priors.
-
-.. note::
-
-   ``rum_bayes`` is currently experimental.  See :doc:`concepts` for details
-   on Bayesian designs and the ``bayes_draws`` argument.
+   examples_nb/d_efficient_rum_simple
+   examples_nb/d_efficient_rum_dummy
+   examples_nb/d_efficient_rum_asc
+   examples_nb/d_efficient_rum_optout
+   examples_nb/d_efficient_rum_avail
+   examples_nb/d_efficient_rum_conds
+   examples_nb/d_efficient_rum_federov
+   examples_nb/d_efficient_rum_rsc
+   examples_nb/a_efficient_rum_simple
+   examples_nb/c_efficient_rum_simple
+   examples_nb/d_efficient_rum_bayes
+   examples_nb/fullfact_simple

@@ -22,7 +22,10 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx_rtd_theme',
-    'sphinx.ext.napoleon']
+    'sphinx.ext.napoleon',
+    'nbsphinx']
+
+nbsphinx_execute = 'never'
 
 autodoc_default_options = {
     'members': True,
