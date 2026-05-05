@@ -1,6 +1,7 @@
 """Modules to construct experimental designs"""
 
 # Import modules
+import itertools
 import pandas as pd
 import numpy as np
 import datetime
@@ -285,29 +286,31 @@ class EffDesign:
         # Return performance and utility balance
         return perf, ubalance_ratio
     
-# Class for Full-factorial design
-# class FullFactDesign:
-#     # Init method
-#     def __init__(self, X: dict):
- 
-#         # Set names and levels
-#         self.names = [j.name for j in X]
-#         self.levs = [j.levels for j in X]
+class FullFactDesign:
+    """Class for full-factorial designs
 
-#         self.J = len(X)
-#         self.K = len(self.levs)
+    Generates a full-factorial design matrix covering all combinations of
+    attribute levels.
 
-#     # Generate design matrix
-#     def gen_design(self):
-#         # Generate default full-fact design
-#         n_levels = [len(j) for j in self.levs]
-#         init_design = fullfact(n_levels)
+    Parameters
+    ----------
+    X : List[Attribute]
+        List of `Attribute` elements.
+    """
 
-#         # Create pandas dataframe
-#         init_design = pd.DataFrame(init_design.astype(int),columns=self.names)
+    def __init__(self, X: list):
+        self.names = [j.name for j in X]
+        self.levs = [j.levels for j in X]
 
-#         # Replace values with the actual attribute levels
-#         for k in range(self.K):
-#             init_design.iloc[:,k].replace(np.arange(n_levels[k]),self.levs[k],inplace=True)
+    def gen_design(self):
+        """Generate full-factorial design matrix
+
+        Returns
+        -------
+        design : pandas.DataFrame
+            A Pandas DataFrame with all combinations of attribute levels.
+        """
+        rows = list(itertools.product(*self.levs))
+        return pd.DataFrame(rows, columns=self.names)
 
 #         return init_design
