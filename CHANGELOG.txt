@@ -1,3 +1,6 @@
+1.0.1
+- Fix: relaxed pandas requirement to >=2.0.0 to resolve installation conflict with Streamlit
+
 1.0.0
 - A-efficient designs: minimise A-error (trace(I⁻¹)/K) via criterion='a'
 - C-efficient designs: minimise sum of WTP variances (delta method) via criterion='c', cost_param, wtp_params
