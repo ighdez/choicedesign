@@ -1,6 +1,6 @@
 [project]
 name = "choicedesign"
-version = "1.0.0"
+version = "1.0.1"
 description = "Experimental designs for discrete choice models."
 authors = [
     {name = "ighdez",email = "joseignaciohernandezh@gmail.com"}
