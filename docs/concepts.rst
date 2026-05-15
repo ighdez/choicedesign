@@ -115,6 +115,15 @@ designs that satisfy all conditions are accepted.
        must also hold.
    * - ``'alt1_cost > alt2_cost & alt1_time < alt2_time'``
      - Compound: all sub-conditions joined by ``&`` must hold simultaneously.
+   * - ``'(alt1_A + alt1_B + alt1_C) > 0'``
+     - Arithmetic expression on the left-hand side.  Any mix of attribute
+       names and numeric constants combined with ``+``, ``-``, ``*``, ``/``
+       and parentheses is valid on either side of the comparison.
+   * - ``'if (alt1_A + alt1_B) > 0 then alt1_price >= 0'``
+     - Arithmetic expression inside an ``if/then`` antecedent or consequent.
+
+Arithmetic expressions can appear on either side of any comparison operator
+and can be freely combined with ``if/then`` and ``&``.
 
 Attribute names in condition strings must exactly match the ``name`` argument
 of the corresponding :class:`~choicedesign.expressions.Attribute`.  A typo

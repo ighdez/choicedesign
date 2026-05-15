@@ -9,6 +9,7 @@ Contains helpers for:
 """
 
 # Import modules
+import ast
 import re
 import numpy as np
 import pandas as pd
@@ -106,7 +107,9 @@ def _parse_condition(cond_str: str, names: list):
     """Parse a condition string into a callable.
 
     Supports binary conditions ('A > B'), if/then conditionals
-    ('if A > v then B < w'), and & compounds ('A > v & B < w').
+    ('if A > v then B < w'), compound conditions ('A > v & B < w'),
+    and arithmetic expressions on either side of a comparison
+    ('(A + B + C) > 0', 'A * 2 < B - 1').
     Attribute names are resolved to column indices at parse time so
     any typo raises ValueError immediately, before the design loop runs.
 
@@ -133,38 +136,68 @@ def _parse_condition(cond_str: str, names: list):
         '<':  lambda a, b: a < b,
     }
 
-    def _resolve(token):
-        token = token.strip()
-        if token in names:
-            idx = names.index(token)
-            return lambda desmat, i=idx: desmat[:, i]
+    def _parse_expr(expr_str):
+        """Parse an arithmetic expression (attributes, constants, +/-/*/÷) into a callable."""
+        expr_str = expr_str.strip()
         try:
-            val = float(token)
-            return lambda desmat, v=val: np.full(desmat.shape[0], v)
-        except ValueError:
-            raise ValueError(
-                f"'{token}' is not a known attribute or a numeric value. "
-                f"Known attributes: {names}"
-            )
+            tree = ast.parse(expr_str, mode='eval')
+        except SyntaxError:
+            raise ValueError(f"Cannot parse expression: '{expr_str}'")
+
+        def _eval_node(node):
+            if isinstance(node, ast.Expression):
+                return _eval_node(node.body)
+            elif isinstance(node, ast.Name):
+                name = node.id
+                if name not in names:
+                    raise ValueError(
+                        f"Unknown attribute '{name}' in expression '{expr_str}'. "
+                        f"Known attributes: {names}"
+                    )
+                idx = names.index(name)
+                return lambda desmat, i=idx: desmat[:, i]
+            elif isinstance(node, ast.Constant):
+                val = float(node.value)
+                return lambda desmat, v=val: np.full(desmat.shape[0], v)
+            elif isinstance(node, ast.BinOp):
+                left_fn  = _eval_node(node.left)
+                right_fn = _eval_node(node.right)
+                if isinstance(node.op, ast.Add):
+                    return lambda desmat, l=left_fn, r=right_fn: l(desmat) + r(desmat)
+                elif isinstance(node.op, ast.Sub):
+                    return lambda desmat, l=left_fn, r=right_fn: l(desmat) - r(desmat)
+                elif isinstance(node.op, ast.Mult):
+                    return lambda desmat, l=left_fn, r=right_fn: l(desmat) * r(desmat)
+                elif isinstance(node.op, ast.Div):
+                    return lambda desmat, l=left_fn, r=right_fn: l(desmat) / r(desmat)
+                else:
+                    raise ValueError(
+                        f"Unsupported operator in expression '{expr_str}': "
+                        f"{type(node.op).__name__}"
+                    )
+            elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+                operand_fn = _eval_node(node.operand)
+                return lambda desmat, o=operand_fn: -o(desmat)
+            else:
+                raise ValueError(
+                    f"Unsupported element in expression '{expr_str}': "
+                    f"{type(node).__name__}"
+                )
+
+        return _eval_node(tree)
 
     def _parse_atomic(s):
         s = s.strip()
         match = re.match(r'^(.+?)\s*(>=|<=|==|!=|>|<)\s*(.+)$', s)
         if not match:
             raise ValueError(f"Cannot parse condition fragment: '{s}'")
-        left_token = match.group(1).strip()
+        left_token  = match.group(1).strip()
         op          = match.group(2)
         right_token = match.group(3).strip()
 
-        if left_token not in names:
-            raise ValueError(
-                f"Unknown attribute '{left_token}' in condition '{cond_str}'. "
-                f"Known attributes: {names}"
-            )
-
-        left_fn = _resolve(left_token)
-        right_fn = _resolve(right_token)
-        op_fn = _OPS[op]
+        left_fn  = _parse_expr(left_token)
+        right_fn = _parse_expr(right_token)
+        op_fn    = _OPS[op]
 
         return lambda desmat, l=left_fn, r=right_fn, o=op_fn: o(l(desmat), r(desmat))
 

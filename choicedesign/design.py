@@ -72,13 +72,18 @@ class EffDesign:
         Parameters
         -------
         cond : list[str], optional
-            List of conditions that the final design must hold. Each element 
-            is a string that contains a single condition. Conditions 
-            can be of the form of binary relations (e.g., `X > Y` where `X` 
-            and `Y` are attributes of a specific alternative) or conditional 
-            relations (e.g., `if X > a then Y < b` where `a` and `b` are values).
-            Users can specify multiple conditions when the operator `if` is defined, 
-            separated by the operator `&`, by default None
+            List of conditions that the final design must hold. Each element
+            is a string that contains a single condition. Supported forms:
+
+            - Binary relation: ``'X > Y'`` (attribute vs attribute or value)
+            - Conditional: ``'if X > a then Y < b'``
+            - Compound (AND): ``'X > a & Y < b'``
+            - Arithmetic expressions on either side: ``'(X + Y + Z) > 0'``,
+              ``'if (X + Y) > 0 then P >= 0'``
+
+            Arithmetic expressions support ``+``, ``-``, ``*``, ``/`` and
+            parentheses with any mix of attribute names and numeric constants.
+            By default None.
         seed : bool, None
             Random seed, by default None
 
