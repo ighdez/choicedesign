@@ -170,13 +170,18 @@ class EffDesign:
         if seed is not None:
             np.random.seed(seed)
 
+        # Keep original stopping-criteria values for the output report
+        _iter_lim_orig     = iter_lim
+        _noimprov_lim_orig = noimprov_lim
+        _time_lim_orig     = time_lim
+
         # Set stopping criteria if defined
         if iter_lim is None:
             iter_lim = np.inf
-        
+
         if noimprov_lim is None:
             noimprov_lim = np.inf
-            
+
         if time_lim is None:
             time_lim = np.inf
 
@@ -257,6 +262,25 @@ class EffDesign:
         # else:
         optimal_design = pd.DataFrame(optimal_design,columns=['CS'] + self.names)
 
+        # Store summary for export_output()
+        self._last_output = {
+            'timestamp':      datetime.datetime.now(),
+            'ncs':            self.N,
+            'attributes':     self.names,
+            'model':          model,
+            'algorithm':      algorithm,
+            'criterion':      criterion,
+            'criterion_label': criterion_label,
+            'iter_lim':       _iter_lim_orig,
+            'noimprov_lim':   _noimprov_lim_orig,
+            'time_lim':       _time_lim_orig,
+            'init_perf':      init_perf,
+            'final_perf':     final_perf,
+            'ubalance_ratio': ubalance_ratio,
+            'final_iter':     final_iter,
+            'elapsed_time':   elapsed_time,
+        }
+
         # Return a summary if verbose is True
         if verbose:
             print('Optimization complete')
@@ -266,7 +290,7 @@ class EffDesign:
             print('Utility Balance ratio: ',round(ubalance_ratio,2),'%')
             print('Algorithm iterations: ',final_iter)
             print('')
-        
+
         # Return the optimal design
         return optimal_design, init_perf, final_perf, final_iter, ubalance_ratio
 
@@ -298,6 +322,78 @@ class EffDesign:
         design['Block'] = blocksrow
 
         return design, corr_list
+
+    # Export optimisation output
+    def export_output(self, filepath: str):
+        """Save a plain-text optimisation summary to a file.
+
+        The summary mirrors the information printed by :meth:`optimise` when
+        ``verbose=True``, plus design configuration and stopping-criteria
+        details.  :meth:`optimise` must have been called at least once before
+        invoking this method.
+
+        Parameters
+        ----------
+        filepath : str
+            Destination path, e.g. ``'optimisation_summary.txt'``.
+
+        Raises
+        ------
+        RuntimeError
+            If :meth:`optimise` has not yet been called on this object.
+        """
+        if not hasattr(self, '_last_output'):
+            raise RuntimeError(
+                "No optimisation output available. Call optimise() first."
+            )
+
+        o = self._last_output
+        crit   = o['criterion_label']
+        sep    = '=' * 42
+        subsep = '-' * 42
+
+        def _fmt_lim(val, unit=''):
+            if val is None:
+                return '—'
+            return f'{val}{unit}'
+
+        improvement = (
+            (o['init_perf'] - o['final_perf']) / o['init_perf'] * 100
+            if o['init_perf'] != 0 else float('nan')
+        )
+        elapsed_str = str(datetime.timedelta(seconds=o['elapsed_time']))[:7]
+
+        lines = [
+            'ChoiceDesign — Optimisation Summary',
+            sep,
+            f"Generated  : {o['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}",
+            '',
+            'Design configuration',
+            subsep,
+            f"Choice situations : {o['ncs']}",
+            f"Attributes        : {', '.join(o['attributes'])}",
+            f"Model             : {o['model']}",
+            f"Algorithm         : {o['algorithm']}",
+            f"Criterion         : {crit}",
+            '',
+            'Stopping criteria',
+            subsep,
+            f"Time limit (min)  : {_fmt_lim(o['time_lim'])}",
+            f"Iteration limit   : {_fmt_lim(o['iter_lim'])}",
+            f"No-improvement    : {_fmt_lim(o['noimprov_lim'])}",
+            '',
+            'Results',
+            subsep,
+            f"Initial {crit:<13}: {o['init_perf']:.6f}",
+            f"Final {crit:<15}: {o['final_perf']:.6f}",
+            f"Improvement       : {improvement:.1f} %",
+            f"Utility balance   : {o['ubalance_ratio']:.2f} %",
+            f"Iterations        : {o['final_iter']}",
+            f"Elapsed time      : {elapsed_str}",
+        ]
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(lines) + '\n')
 
     # Evaluate
     def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl', criterion: str = 'd', cost_param=None, wtp_params=None, bayes_draws: int = None, seed: int = None):

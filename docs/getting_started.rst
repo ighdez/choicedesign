@@ -107,6 +107,19 @@ column and all attributes::
 
     blocked_design, corr_history = design.gen_blocks(optimal_design, n_blocks=3)
 
+**7. Optional: save the optimisation summary**
+
+After calling :meth:`~choicedesign.design.EffDesign.optimise`,
+:meth:`~choicedesign.design.EffDesign.export_output` writes a plain-text
+summary of the run to a file.  The summary includes the design configuration,
+stopping criteria used, initial and final criterion values, percentage
+improvement, utility balance ratio, iteration count, and elapsed time::
+
+    design.export_output('optimisation_summary.txt')
+
+The file can be called any time after ``optimise()`` has been run.  Calling it
+before raises a ``RuntimeError``.
+
 Evaluating an existing design
 ------------------------------
 
