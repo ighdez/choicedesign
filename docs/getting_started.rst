@@ -107,6 +107,39 @@ column and all attributes::
 
     blocked_design, corr_history = design.gen_blocks(optimal_design, n_blocks=3)
 
+**7. Optional: export to Excel**
+
+:meth:`~choicedesign.design.EffDesign.export_design` writes the design to an
+Excel file in the format seen by survey respondents — one row per attribute,
+one column per alternative, one choice situation block per sheet.
+
+Pass an ``attr_names`` dictionary that maps each internal column name to the
+display label that should appear in the table.  Columns sharing the same label
+are placed in the same row (one cell per alternative).  If the design was
+blocked with :meth:`~choicedesign.design.EffDesign.gen_blocks`, one sheet per
+block is created automatically::
+
+    attr_names = {
+        'alt1_cost': 'Cost',       'alt2_cost': 'Cost',
+        'alt1_time': 'Travel time','alt2_time': 'Travel time',
+    }
+
+    # Unblocked design — single sheet
+    design.export_design(optimal_design, attr_names, 'my_design.xlsx')
+
+    # Blocked design — one sheet per block
+    blocked_design, _ = design.gen_blocks(optimal_design, n_blocks=3)
+    design.export_design(blocked_design, attr_names, 'my_design_blocked.xlsx')
+
+    # With an opt-out alternative — adds a column with no attribute levels
+    design.export_design(optimal_design, attr_names, 'my_design.xlsx', opt_out=True)
+
+    # Custom alternative column headers
+    design.export_design(
+        optimal_design, attr_names, 'my_design.xlsx',
+        alt_names=['Bus', 'Car'],
+    )
+
 Evaluating an existing design
 ------------------------------
 

@@ -304,6 +304,119 @@ class EffDesign:
 
         return design, corr_list
 
+    # Export design
+    def export_design(self, design: pd.DataFrame, attr_names: dict, filepath: str, opt_out: bool = False, alt_names: list = None):
+        """Export design to Excel in respondent-facing choice situation format.
+
+        Writes one sheet per block (or a single sheet when the design has no
+        ``Block`` column).  Inside each sheet, choice situations are stacked
+        downward; each row is an attribute and each column is an alternative.
+
+        Parameters
+        ----------
+        design : pd.DataFrame
+            Design from :meth:`optimise` or :meth:`gen_blocks`.
+        attr_names : dict
+            Mapping from internal column names to display row labels.
+            Columns that share the same display label appear in the same row
+            (one per alternative column).
+            Example: ``{'alt1_time': 'Travel time', 'alt2_time': 'Travel time',
+            'alt1_cost': 'Cost', 'alt2_cost': 'Cost'}``
+        filepath : str
+            Destination path, e.g. ``'design.xlsx'``.
+        opt_out : bool, optional
+            Add an opt-out column with no attribute levels, by default False.
+        alt_names : list[str], optional
+            Custom headers for the alternative columns.  Defaults to
+            ``['Alt 1', 'Alt 2', …]``.
+        """
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill
+        except ImportError:
+            raise ImportError("openpyxl is required for export_design(). Install it with: pip install openpyxl")
+
+        # Build ordered groups: display_name -> [col1, col2, ...]
+        groups = {}
+        for col, display in attr_names.items():
+            if col not in design.columns:
+                raise ValueError(f"Column '{col}' not found in design.")
+            groups.setdefault(display, []).append(col)
+
+        n_alts = max(len(cols) for cols in groups.values())
+
+        if alt_names is None:
+            alt_names = [f'Alt {i + 1}' for i in range(n_alts)]
+        elif len(alt_names) != n_alts:
+            raise ValueError(
+                f"alt_names has {len(alt_names)} entries but {n_alts} alternatives were inferred."
+            )
+
+        col_headers = alt_names + (['Opt-out'] if opt_out else [])
+        n_cols = 1 + len(col_headers)
+
+        blocked = 'Block' in design.columns
+        block_ids = sorted(design['Block'].unique()) if blocked else [None]
+
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
+
+        header_font = Font(bold=True)
+        cs_fill = PatternFill(fill_type='solid', fgColor='D9E1F2')
+        center = Alignment(horizontal='center', vertical='center')
+
+        for block_id in block_ids:
+            if blocked:
+                sheet_name = f'Block {int(block_id)}'
+                block_design = design[design['Block'] == block_id].reset_index(drop=True)
+            else:
+                sheet_name = 'Design'
+                block_design = design.reset_index(drop=True)
+
+            ws = wb.create_sheet(title=sheet_name)
+
+            # Column header row
+            ws.cell(row=1, column=1, value='Attribute').font = header_font
+            for j, name in enumerate(col_headers):
+                cell = ws.cell(row=1, column=j + 2, value=name)
+                cell.font = header_font
+                cell.alignment = center
+
+            current_row = 2
+
+            for _, row_data in block_design.iterrows():
+                cs_val = int(row_data['CS'])
+
+                # Choice-situation header (merged across all columns)
+                ws.merge_cells(
+                    start_row=current_row, start_column=1,
+                    end_row=current_row, end_column=n_cols
+                )
+                cs_cell = ws.cell(row=current_row, column=1, value=f'Choice situation {cs_val}')
+                cs_cell.font = header_font
+                cs_cell.fill = cs_fill
+                cs_cell.alignment = center
+                current_row += 1
+
+                # One row per display attribute
+                for display_name, cols in groups.items():
+                    ws.cell(row=current_row, column=1, value=display_name)
+                    for j in range(n_alts):
+                        if j < len(cols):
+                            ws.cell(row=current_row, column=j + 2, value=row_data[cols[j]])
+                    if opt_out:
+                        ws.cell(row=current_row, column=n_cols, value='-')
+                    current_row += 1
+
+                current_row += 1  # blank row between choice situations
+
+            # Approximate column widths
+            for col in ws.columns:
+                width = max((len(str(cell.value)) if cell.value is not None else 0) for cell in col)
+                ws.column_dimensions[col[0].column_letter].width = max(width + 2, 12)
+
+        wb.save(filepath)
+
     # Evaluate
     def evaluate(self, design: pd.DataFrame, V: dict, model: str = 'mnl', criterion: str = 'd', cost_param=None, wtp_params=None, bayes_draws: int = None, seed: int = None):
         """Evaluate design
