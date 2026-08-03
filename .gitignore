@@ -9,3 +9,4 @@ docs/_build/
 examples/d_efficient_rum_cs_avail.ipynb
 examples/fullfact_simple.ipynb
 examples/d_efficient_rum_bayes.ipynb
+.venv/
